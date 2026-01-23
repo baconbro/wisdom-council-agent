@@ -1,0 +1,38 @@
+"""
+Wisdom Council Agent
+====================
+
+A multi-head AI agent architecture inspired by The Matrix's 
+Architect and Oracle dynamic.
+
+Example:
+    >>> from wisdom_council import WisdomCouncilAgent
+    >>> agent = WisdomCouncilAgent()
+    >>> result = await agent.run("Create a project plan")
+"""
+
+__version__ = "0.1.0"
+__author__ = "Your Name"
+__license__ = "MIT"
+
+from wisdom_council.agent import WisdomCouncilAgent
+from wisdom_council.council import WisdomCouncil, CouncilHead, CouncilDecision
+from wisdom_council.heads import Architect, Oracle, Guardian, Synthesizer
+from wisdom_council.executor import Executor, SubAgent
+from wisdom_council.memory import MemoryManager
+from wisdom_council.checkpoint import Checkpointer
+
+__all__ = [
+    "WisdomCouncilAgent",
+    "WisdomCouncil",
+    "CouncilHead",
+    "CouncilDecision",
+    "Architect",
+    "Oracle", 
+    "Guardian",
+    "Synthesizer",
+    "Executor",
+    "SubAgent",
+    "MemoryManager",
+    "Checkpointer",
+]

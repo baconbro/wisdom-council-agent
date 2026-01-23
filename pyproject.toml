@@ -1,0 +1,107 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wisdom-council-agent"
+version = "0.1.0"
+description = "Multi-head AI agent architecture inspired by The Matrix's Architect and Oracle"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = [
+    "ai", "agent", "llm", "multi-agent", "langraph", 
+    "orchestration", "wisdom", "deliberation"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "ollama>=0.3.0",
+    "openai>=1.0.0",
+    "anthropic>=0.30.0",
+    "mem0ai>=0.1.0",
+    "qdrant-client>=1.9.0",
+    "redis>=5.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+    "aiohttp>=3.9.0",
+    "tenacity>=8.2.0",
+    "tiktoken>=0.7.0",
+    "rich>=13.7.0",
+    "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.0.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+    "pre-commit>=3.7.0",
+]
+server = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+]
+observability = [
+    "langsmith>=0.1.0",
+    "opentelemetry-api>=1.24.0",
+    "opentelemetry-sdk>=1.24.0",
+]
+all = [
+    "wisdom-council-agent[dev,server,observability]",
+]
+
+[project.scripts]
+wisdom-council = "wisdom_council.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/wisdom-council-agent"
+Documentation = "https://docs.wisdomcouncil.dev"
+Repository = "https://github.com/yourusername/wisdom-council-agent"
+Issues = "https://github.com/yourusername/wisdom-council-agent/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wisdom_council*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "D", "UP", "B", "C4", "SIM"]
+ignore = ["D100", "D104", "D107"]
+
+[tool.ruff.per-file-ignores]
+"tests/*" = ["D"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --cov=wisdom_council --cov-report=term-missing"
