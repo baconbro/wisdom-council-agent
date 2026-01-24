@@ -182,11 +182,8 @@ This architecture implements structured disagreement to produce wiser outputs.
 ## ⚡ Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/wisdom-council-agent.git
-cd wisdom-council-agent
-
 # Install dependencies
+cd wisdom-council-agent
 pip install -r requirements.txt
 
 # Set up local models (using Ollama)
@@ -232,20 +229,9 @@ source venv/bin/activate  # Linux/Mac
 # or
 .\venv\Scripts\activate  # Windows
 
-# Install package
-pip install wisdom-council-agent
-
-# Or install from source
-git clone https://github.com/yourusername/wisdom-council-agent.git
+# Install from source
 cd wisdom-council-agent
 pip install -e .
-```
-
-### Option 2: Docker
-
-```bash
-docker pull wisdomcouncil/agent:latest
-docker run -it --gpus all wisdomcouncil/agent:latest
 ```
 
 ### Model Setup
@@ -1489,37 +1475,6 @@ volumes:
   redis_data:
 ```
 
-### Kubernetes
-
-```yaml
-# kubernetes/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: wisdom-council
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: wisdom-council
-  template:
-    metadata:
-      labels:
-        app: wisdom-council
-    spec:
-      containers:
-      - name: wisdom-council
-        image: wisdomcouncil/agent:latest
-        resources:
-          limits:
-            nvidia.com/gpu: 1
-        envFrom:
-        - configMapRef:
-            name: wisdom-council-config
-        - secretRef:
-            name: wisdom-council-secrets
-```
-
 ### FastAPI Server
 
 ```python
@@ -1589,8 +1544,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ### Development Setup
 
 ```bash
-# Clone and setup
-git clone https://github.com/yourusername/wisdom-council-agent.git
+# Install with dev dependencies
 cd wisdom-council-agent
 pip install -e ".[dev]"
 
@@ -1629,13 +1583,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 - Daniel Kahneman for System 1/System 2 thinking framework
 
 ---
-
-## 📞 Support
-
-- **Documentation**: [docs.wisdomcouncil.dev](https://docs.wisdomcouncil.dev)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/wisdom-council-agent/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/wisdom-council-agent/discussions)
-- **Discord**: [Join our community](https://discord.gg/wisdomcouncil)
 
 ---
 

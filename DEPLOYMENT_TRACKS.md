@@ -284,77 +284,6 @@ python -m wisdom_council.agent --config config.medium.yaml
 
 ---
 
-## 🐳 Docker Deployment
-
-### Small Track
-
-```yaml
-# docker-compose.small.yml
-version: '3.8'
-
-services:
-  wisdom-council:
-    image: wisdom-council:small
-    environment:
-      - WISDOM_COUNCIL_TRACK=small
-    deploy:
-      resources:
-        limits:
-          memory: 32G
-        reservations:
-          devices:
-            - capabilities: [gpu]
-              count: 1
-```
-
-```bash
-docker-compose -f docker-compose.small.yml up
-```
-
-### Medium Track
-
-```yaml
-# docker-compose.medium.yml
-version: '3.8'
-
-services:
-  wisdom-council:
-    image: wisdom-council:medium
-    environment:
-      - WISDOM_COUNCIL_TRACK=medium
-    deploy:
-      resources:
-        limits:
-          memory: 128G
-        reservations:
-          devices:
-            - capabilities: [gpu]
-              count: 2
-```
-
-### Large Track
-
-```yaml
-# docker-compose.large.yml
-version: '3.8'
-
-services:
-  wisdom-council:
-    image: wisdom-council:large
-    environment:
-      - WISDOM_COUNCIL_TRACK=large
-    deploy:
-      resources:
-        limits:
-          memory: 512G
-        reservations:
-          devices:
-            - capabilities: [gpu]
-              count: 4
-```
-
----
-
 ## 🎯 Choosing the Right Track
 
 ### Use Small Track If:
@@ -469,7 +398,6 @@ journalctl -u ollama -f
 
 - [Main README](README.md)
 - [Configuration Guide](config.example.yaml)
-- [API Documentation](docs/API.md)
 - [Architecture Overview](README.md#architecture-overview)
 
 ---
