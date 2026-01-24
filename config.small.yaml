@@ -1,0 +1,387 @@
+# Wisdom Council Agent - Small Deployment Track
+# RAM Requirement: 16GB per model
+# Target: Development, testing, resource-constrained environments
+# Copy to config.yaml and customize for your environment
+
+# =============================================================================
+# DEPLOYMENT TRACK: SMALL
+# =============================================================================
+deployment:
+  track: "small"
+  ram_per_model: "16GB"
+  description: "Lightweight deployment for development and testing"
+  use_case: "Development, testing, low-resource environments"
+
+# =============================================================================
+# COUNCIL CONFIGURATION
+# =============================================================================
+council:
+  # Maximum rounds of debate between council heads
+  max_debate_rounds: 3
+
+  # Threshold for consensus (0.0 - 1.0)
+  # Higher = more agreement required
+  consensus_threshold: 0.8
+
+  # Maximum time for council deliberation (seconds)
+  timeout_seconds: 300
+
+  # Enable verbose logging of deliberations
+  verbose: true
+
+# =============================================================================
+# COUNCIL HEADS - SMALL TRACK (16GB RAM per model)
+# =============================================================================
+heads:
+  # THE ARCHITECT
+  # Role: Logic, precision, systematic planning
+  # Model: Qwen3 8B (fits in ~10GB RAM with 4-bit quantization)
+  architect:
+    enabled: true
+    model: "qwen3:8b"
+    provider: "ollama"  # ollama, openai, anthropic, together
+    temperature: 0.1
+    max_tokens: 4096
+    quantization: "q4_K_M"  # 4-bit quantization for smaller memory footprint
+    constitution:
+      - "Optimize for efficiency and measurability"
+      - "Prefer proven methods over experimental ones"
+      - "Ensure all outputs are actionable and specific"
+      - "Minimize resource usage while maximizing output"
+      - "Every plan must have clear success criteria"
+    system_prompt: |
+      You are the Architect. Your role is to provide rigorous, logical,
+      systematic analysis. You focus on:
+      - Feasibility and constraints
+      - Optimal resource allocation
+      - Clear metrics and milestones
+      - Risk quantification
+
+      Challenge vague thinking. Demand specificity.
+      Your output must always include: steps, timeline, resources, risks.
+
+  # THE ORACLE
+  # Role: Wisdom, intuition, human-centered perspective
+  # Model: Qwen3 8B (same as Architect, different temperature)
+  oracle:
+    enabled: true
+    model: "qwen3:8b"
+    provider: "ollama"
+    temperature: 0.8
+    max_tokens: 4096
+    quantization: "q4_K_M"
+    constitution:
+      - "Consider the human behind the request"
+      - "Look beyond stated needs to underlying needs"
+      - "Value wisdom over mere correctness"
+      - "Consider long-term consequences"
+      - "Simplicity often beats complexity"
+    system_prompt: |
+      You are the Oracle. Your role is to provide wisdom, intuition,
+      and human-centered perspective. You focus on:
+      - What does the human REALLY need?
+      - What are they not saying?
+      - What could go wrong emotionally/politically?
+      - Is there a simpler path?
+
+      Challenge assumptions. Ask "why?" and "for whom?"
+      Your output must always include: human considerations,
+      potential blind spots, alternative framings.
+
+  # THE GUARDIAN
+  # Role: Safety, ethics, risk assessment
+  # Model: Llama 3.1 8B (optimized for safety, ~10GB RAM)
+  guardian:
+    enabled: true
+    model: "llama3.1:8b"
+    provider: "ollama"
+    temperature: 0.3
+    max_tokens: 2048
+    quantization: "q4_K_M"
+    veto_power: true  # Can block plans that violate constitution
+    constitution:
+      - "First, do no harm"
+      - "Protect privacy and confidentiality"
+      - "Ensure ethical alignment"
+      - "Flag potential negative consequences"
+      - "Verify alignment with stated values"
+    system_prompt: |
+      You are the Guardian. Your role is to ensure safety, ethics,
+      and alignment. You focus on:
+      - Could this cause harm?
+      - Are there privacy/security concerns?
+      - Does this align with user's values?
+      - What are the worst-case scenarios?
+
+      You have VETO power on any plan that violates your constitution.
+      Your output must always include: risks identified, ethical review,
+      recommended safeguards.
+
+  # THE SYNTHESIZER
+  # Role: Merge perspectives into balanced action
+  # Model: Qwen3 8B (same as other heads)
+  synthesizer:
+    enabled: true
+    model: "qwen3:8b"
+    provider: "ollama"
+    temperature: 0.4
+    max_tokens: 4096
+    quantization: "q4_K_M"
+    system_prompt: |
+      You are the Synthesizer. Your role is to merge diverse perspectives
+      into balanced, actionable plans. You focus on:
+      - What is the best of each perspective?
+      - How can apparent conflicts be resolved?
+      - What trade-offs are we making and why?
+
+      Never simply average or compromise. Synthesize into something better.
+      Your output must always include: what was incorporated from each head,
+      how conflicts were resolved, final reasoning.
+
+# =============================================================================
+# EXECUTION LAYER - SUB-AGENTS (SMALL TRACK)
+# =============================================================================
+execution:
+  # Default executor model
+  executor_model: "qwen3:8b"
+
+  # Maximum parallel sub-agent calls
+  max_parallel_agents: 2  # Reduced for small track
+
+  # Sub-agent timeout (seconds)
+  agent_timeout: 120
+
+  sub_agents:
+    # RESEARCH AGENT
+    research:
+      enabled: true
+      model: "qwen3:8b"
+      provider: "ollama"
+      temperature: 0.3
+      quantization: "q4_K_M"
+      tools:
+        - "web_search"
+        - "document_reader"
+        - "database_query"
+      system_prompt: |
+        You are a Research Agent. Your job is to:
+        - Gather comprehensive information
+        - Verify facts from multiple sources
+        - Structure findings clearly
+        Return: JSON with sources, findings, confidence scores.
+
+    # ANALYST AGENT
+    analyst:
+      enabled: true
+      model: "qwen3:8b"
+      provider: "ollama"
+      temperature: 0.2
+      quantization: "q4_K_M"
+      tools:
+        - "python_repl"
+        - "calculator"
+        - "chart_generator"
+      system_prompt: |
+        You are an Analyst Agent. Your job is to:
+        - Perform quantitative analysis
+        - Calculate metrics and scores
+        - Identify patterns and risks
+        Return: Analysis results, visualizations, recommendations.
+
+    # CODER AGENT
+    coder:
+      enabled: true
+      model: "deepseek-coder:6.7b"
+      provider: "ollama"
+      temperature: 0.1
+      quantization: "q4_K_M"
+      tools:
+        - "file_writer"
+        - "code_executor"
+        - "test_runner"
+        - "linter"
+      system_prompt: |
+        You are a Coder Agent. Your job is to:
+        - Write clean, tested code
+        - Follow best practices
+        - Document your code
+        Return: Files created, test results, any warnings.
+
+    # WRITER AGENT
+    writer:
+      enabled: true
+      model: "qwen3:8b"
+      provider: "ollama"
+      temperature: 0.6
+      quantization: "q4_K_M"
+      tools:
+        - "document_creator"
+        - "formatter"
+        - "grammar_checker"
+      system_prompt: |
+        You are a Writer Agent. Your job is to:
+        - Create clear, professional documents
+        - Adapt tone to audience
+        - Structure content logically
+        Return: Document content, formatting applied, readability score.
+
+# =============================================================================
+# MEMORY CONFIGURATION
+# =============================================================================
+memory:
+  # Memory provider
+  provider: "mem0"
+
+  # Short-term memory (session)
+  short_term:
+    backend: "redis"
+    host: "localhost"
+    port: 6379
+    ttl_seconds: 3600
+
+  # Long-term memory (persistent)
+  long_term:
+    backend: "qdrant"
+    host: "localhost"
+    port: 6333
+    collection: "wisdom_council_small"
+
+  # Memory extraction settings
+  extraction:
+    model: "qwen3:8b"
+    min_importance_score: 0.7
+
+  # Retention policy
+  retention:
+    max_memories: 5000  # Reduced for small track
+    decay_days: 60
+
+# =============================================================================
+# CONTEXT MANAGEMENT
+# =============================================================================
+context:
+  # Maximum context window usage (tokens)
+  max_tokens: 32000  # Smaller context for 8B models
+
+  # Trigger compression at this threshold
+  compression_threshold: 24000
+
+  # Rolling summary max size
+  summary_max_tokens: 1500
+
+  # Compression model
+  compression_model: "qwen3:8b"
+
+# =============================================================================
+# CHECKPOINTING
+# =============================================================================
+checkpointing:
+  enabled: true
+
+  # Storage backend: sqlite, redis, postgres
+  storage: "sqlite"
+
+  # Path for SQLite storage
+  path: "./checkpoints/small"
+
+  # Save frequency (every N steps)
+  frequency: 5
+
+  # Save before risky operations
+  checkpoint_before_tools: true
+
+  # Maximum checkpoints per thread
+  max_checkpoints_per_thread: 10  # Reduced for small track
+
+# =============================================================================
+# HUMAN-IN-THE-LOOP
+# =============================================================================
+human_approval:
+  enabled: true
+
+  # Actions that require approval
+  require_approval:
+    - "external_communication"
+    - "file_deletion"
+    - "database_modification"
+    - "high_risk_action"
+
+  # Approval timeout (seconds)
+  timeout: 300
+
+  # Default action on timeout: "approve", "reject", "escalate"
+  timeout_action: "reject"
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+observability:
+  # LangSmith integration
+  langsmith:
+    enabled: false
+    api_key: "${LANGSMITH_API_KEY}"
+    project: "wisdom-council-small"
+
+  # Logging
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+    format: "json"  # json, text
+    file: "./logs/wisdom_council_small.log"
+
+  # Metrics
+  metrics:
+    enabled: true
+    export_interval: 60
+
+# =============================================================================
+# API SERVER
+# =============================================================================
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 2  # Reduced for small track
+
+  # CORS
+  cors:
+    enabled: true
+    origins: ["*"]
+
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 30  # Lower for small track
+
+# =============================================================================
+# MODEL PROVIDER SETTINGS
+# =============================================================================
+providers:
+  ollama:
+    host: "http://localhost:11434"
+    timeout: 120
+    num_gpu: 1  # Typically 1 GPU for small models
+
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    organization: "${OPENAI_ORG_ID}"
+
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+
+  together:
+    api_key: "${TOGETHER_API_KEY}"
+
+# =============================================================================
+# RESOURCE CONSTRAINTS
+# =============================================================================
+resources:
+  # Memory limits
+  max_ram_per_model: "16GB"
+  total_system_ram_recommended: "32GB"
+
+  # GPU requirements (optional)
+  gpu_vram_recommended: "12GB"  # For single GPU deployment
+  gpu_count: 1
+
+  # CPU fallback
+  cpu_threads: 8
+  use_cpu_fallback: true
