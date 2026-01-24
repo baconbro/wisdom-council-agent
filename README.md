@@ -15,6 +15,7 @@ A multi-head AI agent architecture inspired by The Matrix's Architect and Oracle
 - [Philosophy](#-philosophy)
 - [Architecture Overview](#-architecture-overview)
 - [Key Components](#-key-components)
+- [Deployment Tracks](#-deployment-tracks)
 - [Quick Start](#-quick-start)
 - [Installation](#-installation)
 - [Configuration](#-configuration)
@@ -177,9 +178,120 @@ This architecture implements structured disagreement to produce wiser outputs.
 | **Executor** | Coordinates sub-agents | Qwen3-72B |
 | **Sub-Agents** | Domain-specific execution | Various (task-optimized) |
 
+> **Note:** The models listed above are for the Large deployment track. See [Deployment Tracks](#-deployment-tracks) for other configurations.
+
+---
+
+## 🎯 Deployment Tracks
+
+The Wisdom Council Agent offers **three deployment tracks** optimized for different resource constraints and use cases:
+
+### Track Comparison
+
+| Track | RAM/Model | Total RAM | GPUs | Primary Model | Guardian Model | Use Case |
+|-------|-----------|-----------|------|---------------|----------------|----------|
+| **🔹 Small** | 16GB | 32GB+ | 1 (12GB+) | Qwen3 8B | Llama 3.1 8B | Development, Testing |
+| **🔷 Medium** | 64GB | 128GB+ | 2 (48GB+) | Qwen3 30B | GPT-OSS Safeguard 20B | Production, Enterprise |
+| **🔶 Large** | 128GB | 512GB+ | 4 (80GB+) | Qwen3 110B | Llama 4 Maverick 70B | High-Performance, Research |
+
+### Quick Track Selection
+
+**Choose Small Track if:**
+- ✅ Development or testing environment
+- ✅ Limited resources (laptop, desktop)
+- ✅ Quick iterations needed
+- ✅ Budget-conscious deployment
+
+**Choose Medium Track if:**
+- ✅ Production environment
+- ✅ Multiple concurrent users
+- ✅ Quality-sensitive applications
+- ✅ Balanced performance/cost requirements
+
+**Choose Large Track if:**
+- ✅ Maximum quality required
+- ✅ Complex reasoning tasks
+- ✅ Research or high-stakes decisions
+- ✅ Enterprise infrastructure available
+
+### Configuration Files
+
+Each track has a dedicated configuration file:
+
+- `config.small.yaml` - Small deployment track
+- `config.medium.yaml` - Medium deployment track (uses Qwen3 30B + GPT-OSS Safeguard 20B)
+- `config.large.yaml` - Large deployment track
+
+**📚 [View Complete Deployment Tracks Guide →](DEPLOYMENT_TRACKS.md)**
+
+The guide includes:
+- Detailed setup instructions for each track
+- Model specifications and RAM usage
+- Performance benchmarks and comparisons
+- Cost analysis
+- Docker deployment examples
+- Troubleshooting and optimization tips
+
+### Quick Start by Track
+
+<details>
+<summary><b>Small Track Setup</b></summary>
+
+```bash
+# Copy configuration
+cp config.small.yaml config.yaml
+
+# Pull models
+ollama pull qwen3:8b
+ollama pull llama3.1:8b
+ollama pull deepseek-coder:6.7b
+
+# Start agent
+python -m wisdom_council.agent
+```
+</details>
+
+<details>
+<summary><b>Medium Track Setup</b></summary>
+
+```bash
+# Copy configuration
+cp config.medium.yaml config.yaml
+
+# Pull models
+ollama pull qwen3:30b
+ollama pull gpt-oss-safeguard:20b
+ollama pull qwen3:14b
+ollama pull deepseek-coder-v2:16b
+
+# Start agent
+python -m wisdom_council.agent
+```
+</details>
+
+<details>
+<summary><b>Large Track Setup</b></summary>
+
+```bash
+# Copy configuration
+cp config.large.yaml config.yaml
+
+# Pull models
+ollama pull qwen3:110b
+ollama pull llama4:maverick-70b
+ollama pull qwen3:72b
+ollama pull deepseek-coder-v2:236b
+
+# Start agent
+python -m wisdom_council.agent
+```
+</details>
+
 ---
 
 ## ⚡ Quick Start
+
+**This quick start uses the Small deployment track** for easy local development. For production deployments, see [Deployment Tracks](#-deployment-tracks).
 
 ```bash
 # Clone the repository
@@ -189,9 +301,12 @@ cd wisdom-council-agent
 # Install dependencies
 pip install -r requirements.txt
 
+# Use Small track configuration (recommended for getting started)
+cp config.small.yaml config.yaml
+
 # Set up local models (using Ollama)
-ollama pull qwen3:235b
-ollama pull llama4:maverick
+ollama pull qwen3:8b
+ollama pull llama3.1:8b
 
 # Run example
 python examples/quick_start.py
@@ -219,9 +334,13 @@ print(result.council_deliberation)  # See the debate!
 ### Prerequisites
 
 - Python 3.10+
-- 64GB+ RAM (for running 235B models locally)
-- NVIDIA GPU with 48GB+ VRAM (recommended) or CPU inference
+- **RAM & GPU Requirements** (varies by deployment track):
+  - **Small Track**: 32GB+ RAM, 1 GPU (12GB+ VRAM) or CPU
+  - **Medium Track**: 128GB+ RAM, 2 GPUs (48GB+ VRAM each)
+  - **Large Track**: 512GB+ RAM, 4 GPUs (80GB+ VRAM each)
 - Docker (optional, for containerized deployment)
+
+> See [Deployment Tracks](#-deployment-tracks) for detailed resource requirements
 
 ### Option 1: Local Installation
 
@@ -250,27 +369,46 @@ docker run -it --gpus all wisdomcouncil/agent:latest
 
 ### Model Setup
 
+> **💡 Tip:** Choose your deployment track first before pulling models. See [Deployment Tracks](#-deployment-tracks).
+
 #### Using Ollama (Recommended for Local)
 
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull required models
-ollama pull qwen3:235b      # Main reasoning model
-ollama pull qwen3:72b       # Faster model for sub-agents
-ollama pull llama4:maverick # Guardian model
-ollama pull deepseek-coder-v2  # Coding specialist
 ```
 
-#### Using vLLM (Production)
+**Small Track Models** (16GB RAM per model):
+```bash
+ollama pull qwen3:8b                # Main reasoning (Architect/Oracle/Synthesizer)
+ollama pull llama3.1:8b             # Guardian model
+ollama pull deepseek-coder:6.7b     # Coding specialist
+```
+
+**Medium Track Models** (64GB RAM per model):
+```bash
+ollama pull qwen3:30b               # Main reasoning (Architect/Oracle/Synthesizer)
+ollama pull gpt-oss-safeguard:20b   # Guardian model (specialized safety)
+ollama pull qwen3:14b               # Execution layer
+ollama pull deepseek-coder-v2:16b   # Coding specialist
+```
+
+**Large Track Models** (128GB RAM per model):
+```bash
+ollama pull qwen3:110b              # Main reasoning (Architect/Oracle/Synthesizer)
+ollama pull llama4:maverick-70b     # Guardian model
+ollama pull qwen3:72b               # Execution layer
+ollama pull deepseek-coder-v2:236b  # Coding specialist
+```
+
+#### Using vLLM (Production - Large Track)
 
 ```bash
 pip install vllm
 
-# Start vLLM server
+# Start vLLM server for Large track
 python -m vllm.entrypoints.openai.api_server \
-    --model Qwen/Qwen3-235B-A22B \
+    --model Qwen/Qwen3-110B-A22B \
     --tensor-parallel-size 4
 ```
 
@@ -281,7 +419,7 @@ python -m vllm.entrypoints.openai.api_server \
 models:
   architect:
     provider: "together"  # or "openai", "anthropic", "fireworks"
-    model: "Qwen/Qwen3-235B-A22B"
+    model: "Qwen/Qwen3-30B"  # Adjust based on your track
     api_key: ${TOGETHER_API_KEY}
 ```
 
