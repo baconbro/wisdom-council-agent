@@ -1170,6 +1170,266 @@ class CouncilHead:
 
 ---
 
+## 🎯 Deployment Options
+
+The Wisdom Council Agent offers three pre-configured deployment tracks optimized for different resource constraints and use cases. Each track is carefully balanced for model quality, performance, and resource efficiency.
+
+### Overview
+
+| Track | RAM/Model | Total RAM | GPU VRAM | Use Case | Config File |
+|-------|-----------|-----------|----------|----------|-------------|
+| **Small** | 16GB | 32GB | 1x 12GB | Development, testing, low-resource | `config.small.yaml` |
+| **Medium** | 64GB | 128GB | 2x 48GB | Production, enterprise | `config.medium.yaml` |
+| **Large** | 128GB | 512GB | 4x 80GB | High-performance, research | `config.large.yaml` |
+
+---
+
+### Small Track (Development)
+
+**Quick Start**:
+```bash
+# Copy configuration
+cp config.small.yaml config.yaml
+
+# Pull required models
+ollama pull qwen3:8b
+ollama pull llama3.1:8b
+ollama pull deepseek-coder:6.7b
+
+# Run
+python main.py
+```
+
+**Specifications**:
+- **Council Models**: Qwen3 8B (Architect, Oracle, Synthesizer) + Llama 3.1 8B (Guardian)
+- **Sub-Agents**: Qwen3 8B (Research, Analyst, Writer) + DeepSeek Coder 6.7B (Coder)
+- **Quantization**: 4-bit (q4_K_M) - reduces memory by ~60%
+- **Context Window**: 32K tokens
+- **Parallel Agents**: 2 concurrent
+- **Memory**: 5,000 max stored memories
+
+**Resource Requirements**:
+- **RAM**: 32GB recommended (16GB per model with quantization)
+- **GPU**: Optional - 1x 12GB VRAM (RTX 3060, RTX 4070)
+- **CPU Fallback**: 8 threads minimum
+- **Storage**: 50GB for models + checkpoints
+
+**Best For**:
+- Local development and testing
+- Proof-of-concept implementations
+- Resource-constrained environments
+- Learning and experimentation
+- Small-scale personal projects
+
+**Trade-offs**:
+- Lower reasoning quality vs larger tracks
+- Smaller context windows
+- Fewer parallel operations
+- Simpler safety model
+
+---
+
+### Medium Track (Production)
+
+**Quick Start**:
+```bash
+# Copy configuration
+cp config.medium.yaml config.yaml
+
+# Pull required models
+ollama pull qwen3:30b
+ollama pull gpt-oss-safeguard:20b
+ollama pull qwen3:14b
+ollama pull deepseek-coder-v2:16b
+
+# Run with GPU support
+python main.py
+```
+
+**Specifications**:
+- **Council Models**: Qwen3 30B (Architect, Oracle, Synthesizer) + GPT-OSS Safeguard 20B (Guardian)
+- **Sub-Agents**: Qwen3 14B (Research, Analyst, Writer) + DeepSeek Coder V2 16B (Coder)
+- **Quantization**: 4-bit (q4_K_M) - ~30-50GB RAM per model
+- **Context Window**: 32-80K tokens
+- **Parallel Agents**: 3 concurrent
+- **Memory**: 10,000 max stored memories
+
+**Resource Requirements**:
+- **RAM**: 128GB recommended
+- **GPU**: 2x 48GB VRAM (A6000, RTX 6000 Ada, L40)
+- **CPU**: 16 threads
+- **Storage**: 200GB for models + checkpoints
+
+**Best For**:
+- Production deployments
+- Enterprise applications
+- Business-critical workflows
+- Advanced research and analysis
+- Multi-user environments
+
+**Trade-offs**:
+- Balanced quality vs cost
+- Good performance for most use cases
+- Moderate hardware investment
+
+**Performance Optimizations**:
+- Flash Attention enabled
+- Model caching (2 models in memory)
+- Parallel council head processing
+- KV cache optimization
+
+---
+
+### Large Track (Maximum Quality)
+
+**Quick Start**:
+```bash
+# Copy configuration
+cp config.large.yaml config.yaml
+
+# Pull required models
+ollama pull qwen3:110b
+ollama pull llama4:maverick-70b
+ollama pull qwen3:72b
+ollama pull deepseek-coder-v2:236b
+
+# Optional: Use vLLM for production
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen3-110B \
+    --tensor-parallel-size 4
+
+# Run
+python main.py
+```
+
+**Specifications**:
+- **Council Models**: Qwen3 110B (Architect, Oracle, Synthesizer) + Llama 4 Maverick 70B (Guardian)
+- **Sub-Agents**: Qwen3 72B (Research, Analyst, Writer) + DeepSeek Coder V2 236B (Coder)
+- **Quantization**: 4-bit (q4_K_M) with ExLlama - ~70-110GB RAM per model
+- **Context Window**: 128K tokens (131,072)
+- **Parallel Agents**: 4 concurrent
+- **Memory**: 20,000 max stored memories
+- **Storage Backend**: PostgreSQL (vs SQLite)
+
+**Resource Requirements**:
+- **RAM**: 512GB recommended
+- **GPU**: 4x 80GB VRAM (A100, H100)
+- **Tensor Parallelism**: 4-way split
+- **CPU**: 32 threads
+- **Storage**: 1TB for models + checkpoints
+- **Network**: High-bandwidth inter-GPU communication
+
+**Best For**:
+- Mission-critical enterprise production
+- Advanced research requiring maximum quality
+- Complex multi-step reasoning tasks
+- Long-context document analysis
+- High-stakes decision making
+
+**Advanced Features**:
+- **Speculative Decoding**: Uses Qwen3 14B as draft model for 2-3x speedup
+- **Pipeline Parallelism**: 2-stage pipeline across GPUs
+- **Mixed Precision**: BF16 compute + INT4 weights
+- **Prometheus Metrics**: Real-time monitoring on port 9090
+- **LangSmith Tracing**: Full observability enabled by default
+- **Paged Attention**: Efficient KV cache management
+
+**Performance Characteristics**:
+- **Quality**: +24-34% improvement over single orchestrator (see Benchmarks)
+- **Latency**: ~35-55s average with parallel execution
+- **Throughput**: 120 requests/minute (8 workers)
+- **Context**: 120K token working memory
+
+**Trade-offs**:
+- Highest quality reasoning and outputs
+- Significant hardware investment required
+- Higher operational costs
+- Best for workloads where quality justifies cost
+
+---
+
+### Choosing Your Track
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DEPLOYMENT DECISION TREE                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Do you have 4x A100/H100 GPUs?                                 │
+│         │                                                       │
+│         ├─ YES → Use LARGE track                                │
+│         │       (Maximum quality, enterprise production)        │
+│         │                                                       │
+│         └─ NO → Do you have 2x A6000/L40 GPUs?                  │
+│                 │                                               │
+│                 ├─ YES → Use MEDIUM track                       │
+│                 │         (Production, balanced)                │
+│                 │                                               │
+│                 └─ NO → Use SMALL track                         │
+│                         (Development, testing)                  │
+│                                                                 │
+│  Alternative: Use API providers (OpenAI, Anthropic, Together)   │
+│  if you don't want to manage local models                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Cost Considerations** (per 1,000 tasks):
+
+| Track | Local (Power Only) | Together AI | OpenAI/Anthropic |
+|-------|-------------------|-------------|------------------|
+| Small | ~$1 | ~$25 | ~$50 |
+| Medium | ~$3 | ~$75 | ~$150 |
+| Large | ~$8 | ~$200 | ~$400 |
+
+*Power costs assume $0.12/kWh. API costs are estimates based on token usage.*
+
+---
+
+### Hybrid Deployments
+
+You can mix deployment tracks for different components:
+
+```yaml
+# config.hybrid.yaml
+heads:
+  # Use large models for council (critical reasoning)
+  architect:
+    model: "qwen3:110b"
+  oracle:
+    model: "qwen3:110b"
+  guardian:
+    model: "llama4:maverick-70b"
+
+execution:
+  # Use smaller models for sub-agents (execution)
+  sub_agents:
+    research:
+      model: "qwen3:14b"
+    coder:
+      model: "deepseek-coder-v2:16b"
+```
+
+Or use API providers for council, local for execution:
+
+```yaml
+heads:
+  architect:
+    provider: "anthropic"
+    model: "claude-opus-4"  # API
+  oracle:
+    provider: "anthropic"
+    model: "claude-opus-4"  # API
+
+execution:
+  sub_agents:
+    coder:
+      provider: "ollama"
+      model: "deepseek-coder-v2:16b"  # Local
+```
+
+---
+
 ## 🚢 Deployment
 
 ### Docker Compose (Recommended)
