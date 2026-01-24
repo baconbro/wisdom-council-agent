@@ -9,9 +9,7 @@ description = "Multi-head AI agent architecture inspired by The Matrix's Archite
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
-authors = [
-    {name = "Your Name", email = "your.email@example.com"}
-]
+authors = []
 keywords = [
     "ai", "agent", "llm", "multi-agent", "langraph", 
     "orchestration", "wisdom", "deliberation"
@@ -73,10 +71,6 @@ all = [
 wisdom-council = "wisdom_council.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/wisdom-council-agent"
-Documentation = "https://docs.wisdomcouncil.dev"
-Repository = "https://github.com/yourusername/wisdom-council-agent"
-Issues = "https://github.com/yourusername/wisdom-council-agent/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
