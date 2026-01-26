@@ -16,6 +16,10 @@ from wisdom_council.executor import Executor
 from wisdom_council.memory import MemoryManager
 from wisdom_council.checkpoint import Checkpointer, SqliteCheckpointer
 from wisdom_council.heads import Architect, Oracle, Guardian, Synthesizer
+from wisdom_council.plan import (
+    Plan, PlanItem, PlanStatus, PlanItemStatus,
+    PlanManager, PlanApprovalRequired
+)
 
 
 class TaskRequest(BaseModel):
@@ -94,33 +98,37 @@ class WisdomCouncilAgent:
         council: Optional[WisdomCouncil] = None,
         memory: Optional[MemoryManager] = None,
         checkpointer: Optional[Checkpointer] = None,
-        require_human_approval: Optional[list[str]] = None
+        plan_manager: Optional[PlanManager] = None,
+        require_human_approval: Optional[list[str]] = None,
+        require_plan_approval: bool = True
     ):
         """
         Initialize the Wisdom Council Agent.
-        
+
         Args:
             config_path: Path to YAML configuration file
             council: Custom WisdomCouncil instance
-            memory: Custom MemoryManager instance  
+            memory: Custom MemoryManager instance
             checkpointer: Custom Checkpointer instance
+            plan_manager: Custom PlanManager for persistent plans
             require_human_approval: List of action types requiring approval
+            require_plan_approval: Whether plans require user approval before execution
         """
         # Load configuration
         self.config = self._load_config(config_path)
-        
+
         # Initialize council
         if council:
             self.council = council
         else:
             self.council = self._create_default_council()
-        
+
         # Initialize memory
         if memory:
             self.memory = memory
         else:
             self.memory = self._create_default_memory()
-        
+
         # Initialize checkpointer
         if checkpointer:
             self.checkpointer = checkpointer
@@ -128,19 +136,28 @@ class WisdomCouncilAgent:
             self.checkpointer = self._create_default_checkpointer()
         else:
             self.checkpointer = None
-        
+
+        # Initialize plan manager for persistent, visible plans
+        if plan_manager:
+            self.plan_manager = plan_manager
+        else:
+            self.plan_manager = self._create_default_plan_manager()
+
         # Human approval settings
         self.require_human_approval = require_human_approval or \
             self.config.get("human_approval", {}).get("require_approval", [])
-        
+        self.require_plan_approval = require_plan_approval or \
+            self.config.get("plan", {}).get("require_approval", True)
+
         # Initialize executor
         self.executor = Executor(
             config=self.config.get("execution", {}),
             checkpointer=self.checkpointer
         )
-        
+
         # State
         self._pending_approvals = {}
+        self._current_plan_id = None
     
     def _load_config(self, config_path: Optional[str]) -> dict:
         """Load configuration from YAML file"""
@@ -222,6 +239,24 @@ class WisdomCouncilAgent:
             db_path=checkpoint_config.get("path", "./checkpoints"),
             save_frequency=checkpoint_config.get("frequency", 5)
         )
+
+    def _create_default_plan_manager(self) -> PlanManager:
+        """Create default plan manager for persistent plans"""
+        plan_config = self.config.get("plan", {})
+        return PlanManager(
+            plans_dir=plan_config.get("path", "./plans"),
+            on_approval_requested=self._on_plan_approval_requested,
+            on_plan_updated=self._on_plan_updated
+        )
+
+    async def _on_plan_approval_requested(self, plan: Plan) -> None:
+        """Callback when a plan needs approval"""
+        # Display the plan for user visibility
+        print("\n" + plan.display() + "\n")
+
+    async def _on_plan_updated(self, plan: Plan) -> None:
+        """Callback when a plan is updated"""
+        pass
     
     async def run(
         self,
@@ -473,5 +508,346 @@ class WisdomCouncilAgent:
         checkpoint = await self.checkpointer.get(thread_id, checkpoint_id)
         if not checkpoint:
             raise ValueError(f"Checkpoint {checkpoint_id} not found")
-        
+
         await self.executor.restore_state(checkpoint.state)
+
+    # =========================================================================
+    # Plan Management Methods
+    # =========================================================================
+
+    async def create_plan(
+        self,
+        task: str,
+        context: Optional[dict] = None,
+        auto_submit: bool = True
+    ) -> Plan:
+        """
+        Create a plan for a task through council deliberation.
+
+        The plan is stored persistently and made visible for user approval.
+
+        Args:
+            task: The task description
+            context: Additional context
+            auto_submit: Automatically submit for user approval
+
+        Returns:
+            The created Plan (awaiting approval)
+        """
+        context = context or {}
+
+        # 1. Retrieve relevant memories
+        memories = await self.memory.retrieve(task, limit=10)
+        context["memories"] = memories
+
+        # 2. Council deliberates and creates plan
+        decision = await self.council.deliberate(task, context)
+
+        if not decision.approved:
+            raise ValueError(f"Council rejected task: {decision.dissents}")
+
+        # 3. Parse the plan into structured items
+        plan_items = self._parse_plan_to_items(decision.plan)
+
+        # 4. Create persistent plan
+        plan = await self.plan_manager.create_plan(
+            name=f"Plan: {task[:50]}...",
+            description=task,
+            items=plan_items,
+            created_by="council",
+            auto_submit=auto_submit,
+            context={
+                "task": task,
+                "original_context": context,
+                "deliberation": decision.to_dict()
+            }
+        )
+
+        self._current_plan_id = plan.id
+        return plan
+
+    def _parse_plan_to_items(self, plan: dict) -> list[dict]:
+        """Parse a council plan into structured plan items"""
+        items = []
+        content = plan.get("content", plan.get("raw", str(plan)))
+
+        # Simple heuristic parsing - split by numbered items or bullets
+        lines = content.split("\n")
+        current_item = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Check for numbered items (1., 2., etc.) or bullets (-, *, etc.)
+            is_item_start = (
+                (len(line) > 2 and line[0].isdigit() and line[1] in '.)')
+                or line.startswith('- ')
+                or line.startswith('* ')
+                or line.startswith('• ')
+            )
+
+            if is_item_start:
+                if current_item:
+                    items.append(current_item)
+
+                # Clean up the line
+                if line[0].isdigit():
+                    title = line[2:].strip() if len(line) > 2 else line
+                else:
+                    title = line[2:].strip()
+
+                current_item = {
+                    "title": title[:100],  # Truncate long titles
+                    "description": title,
+                    "temp_id": f"item-{len(items) + 1}"
+                }
+            elif current_item:
+                # Append to current item description
+                current_item["description"] += f" {line}"
+
+        if current_item:
+            items.append(current_item)
+
+        # If no items found, create a single item from the whole content
+        if not items:
+            items.append({
+                "title": "Execute plan",
+                "description": content[:500],
+                "temp_id": "item-1"
+            })
+
+        return items
+
+    async def show_plan(self, plan_id: Optional[str] = None) -> str:
+        """
+        Display a plan for user visibility.
+
+        Args:
+            plan_id: The plan ID (uses current plan if not provided)
+
+        Returns:
+            Formatted plan display string
+        """
+        plan_id = plan_id or self._current_plan_id
+        if not plan_id:
+            return "No active plan. Use create_plan() first."
+
+        return await self.plan_manager.display_plan(plan_id)
+
+    async def show_all_plans(self, status: Optional[PlanStatus] = None) -> str:
+        """Display all plans"""
+        return await self.plan_manager.display_all_plans(status)
+
+    async def approve_plan(
+        self,
+        plan_id: Optional[str] = None,
+        comment: str = None
+    ) -> Plan:
+        """
+        Approve a plan for execution.
+
+        Args:
+            plan_id: The plan ID (uses current plan if not provided)
+            comment: Optional approval comment
+
+        Returns:
+            The approved Plan
+        """
+        plan_id = plan_id or self._current_plan_id
+        if not plan_id:
+            raise ValueError("No plan specified and no current plan")
+
+        return await self.plan_manager.approve(plan_id, comment=comment)
+
+    async def reject_plan(
+        self,
+        plan_id: Optional[str] = None,
+        reason: str = "User rejected"
+    ) -> Plan:
+        """
+        Reject a plan.
+
+        Args:
+            plan_id: The plan ID (uses current plan if not provided)
+            reason: Reason for rejection
+
+        Returns:
+            The rejected Plan
+        """
+        plan_id = plan_id or self._current_plan_id
+        if not plan_id:
+            raise ValueError("No plan specified and no current plan")
+
+        return await self.plan_manager.reject(plan_id, reason=reason)
+
+    async def execute_plan(
+        self,
+        plan_id: Optional[str] = None,
+        thread_id: Optional[str] = None
+    ) -> AgentResult:
+        """
+        Execute an approved plan.
+
+        The plan must be approved before execution.
+
+        Args:
+            plan_id: The plan ID (uses current plan if not provided)
+            thread_id: Thread ID for checkpointing
+
+        Returns:
+            AgentResult with execution results
+        """
+        import time
+        start_time = time.time()
+
+        plan_id = plan_id or self._current_plan_id
+        if not plan_id:
+            raise ValueError("No plan specified and no current plan")
+
+        plan = await self.plan_manager.get_plan(plan_id)
+        if not plan:
+            raise ValueError(f"Plan {plan_id} not found")
+
+        if plan.status == PlanStatus.AWAITING_APPROVAL:
+            raise PlanApprovalRequired(plan)
+
+        if plan.status == PlanStatus.REJECTED:
+            raise ValueError(f"Plan was rejected: {plan.rejection_reason}")
+
+        if plan.status not in (PlanStatus.APPROVED, PlanStatus.IN_PROGRESS):
+            raise ValueError(f"Plan cannot be executed (status: {plan.status})")
+
+        # Generate thread ID if not provided
+        thread_id = thread_id or str(uuid.uuid4())
+        tokens_used = 0
+        execution_trace = []
+
+        # Mark plan as in progress
+        if plan.status == PlanStatus.APPROVED:
+            plan.start_execution()
+            await self.plan_manager.update_plan(plan)
+
+        # Execute each plan item
+        while True:
+            # Get next ready item
+            item = await self.plan_manager.get_next_item(plan_id)
+            if not item:
+                break
+
+            # Mark item as in progress
+            await self.plan_manager.start_item(plan_id, item.id)
+
+            # Execute the item
+            try:
+                result = await self.executor.execute(
+                    plan={"content": item.description},
+                    thread_id=thread_id,
+                    context=plan.context
+                )
+                tokens_used += result.tokens_used
+
+                # Mark item as completed
+                await self.plan_manager.complete_item(
+                    plan_id, item.id,
+                    result=result.final_output
+                )
+
+                execution_trace.append({
+                    "item_id": item.id,
+                    "item_title": item.title,
+                    "status": "completed",
+                    "result": result.to_dict()
+                })
+
+            except Exception as e:
+                # Mark item as failed
+                await self.plan_manager.fail_item(plan_id, item.id, str(e))
+                execution_trace.append({
+                    "item_id": item.id,
+                    "item_title": item.title,
+                    "status": "failed",
+                    "error": str(e)
+                })
+                # Continue with other items that don't depend on this one
+
+        # Reload plan to get final state
+        plan = await self.plan_manager.get_plan(plan_id)
+
+        execution_time = time.time() - start_time
+
+        # Create a summary from execution trace
+        final_output = self._summarize_plan_execution(plan, execution_trace)
+
+        return AgentResult(
+            final_output=final_output,
+            deliberation=plan.context.get("deliberation", {}),
+            execution_trace=execution_trace,
+            tokens_used=tokens_used,
+            execution_time=execution_time,
+            thread_id=thread_id
+        )
+
+    def _summarize_plan_execution(self, plan: Plan, trace: list) -> str:
+        """Create a summary of plan execution"""
+        progress = plan.get_progress()
+        lines = [
+            f"Plan '{plan.name}' execution complete.",
+            f"Progress: {progress['completed']}/{progress['total']} items ({progress['percentage']}%)",
+            ""
+        ]
+
+        for item in trace:
+            status = "DONE" if item["status"] == "completed" else "FAILED"
+            lines.append(f"[{status}] {item['item_title']}")
+
+        if progress['failed'] > 0:
+            lines.append(f"\nWarning: {progress['failed']} items failed.")
+
+        return "\n".join(lines)
+
+    async def run_with_plan(
+        self,
+        task: str,
+        context: Optional[dict] = None,
+        thread_id: Optional[str] = None,
+        wait_for_approval: bool = True
+    ) -> AgentResult:
+        """
+        Run a task with a visible, persistent plan that requires user approval.
+
+        This is the recommended way to run complex tasks:
+        1. Creates a plan from council deliberation
+        2. Displays the plan for user visibility
+        3. Waits for user approval (or raises PlanApprovalRequired)
+        4. Executes the approved plan
+
+        Args:
+            task: The task description
+            context: Additional context
+            thread_id: Thread ID for checkpointing
+            wait_for_approval: If False, raises PlanApprovalRequired instead of waiting
+
+        Returns:
+            AgentResult with execution results
+
+        Raises:
+            PlanApprovalRequired: If plan needs approval and wait_for_approval=False
+        """
+        # Create the plan
+        plan = await self.create_plan(task, context, auto_submit=True)
+
+        # Display the plan
+        print(await self.show_plan(plan.id))
+
+        if self.require_plan_approval and plan.status == PlanStatus.AWAITING_APPROVAL:
+            if not wait_for_approval:
+                raise PlanApprovalRequired(plan)
+
+            # In a real implementation, this would wait for user input
+            # For now, we raise the exception to let the caller handle approval
+            raise PlanApprovalRequired(plan)
+
+        # Execute the approved plan
+        return await self.execute_plan(plan.id, thread_id)
