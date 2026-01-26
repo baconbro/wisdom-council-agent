@@ -14,19 +14,21 @@ async def basic_example():
     print("=" * 60)
     print("WISDOM COUNCIL AGENT - Basic Example")
     print("=" * 60)
-    
+
     # Initialize agent with default configuration
     agent = WisdomCouncilAgent()
-    
-    # Define a task
-    task = """
-    Create a project management framework for a university IT department
-    that needs to manage 25 concurrent projects across 6 domains:
-    Finance, HR, Student Systems, Research, Infrastructure, and Data Analytics.
-    """
-    
+
+    # Ask user for their task
+    print("\nWhat would you like the Wisdom Council to help you with?")
+    print("(Enter your question or task description)\n")
+    task = input("Your task: ").strip()
+
+    if not task:
+        print("No task provided. Using example task.")
+        task = "Create a project management framework for a university IT department."
+
     # Run the task
-    print("\n📋 Task:", task.strip())
+    print("\n📋 Task:", task)
     print("\n🏛️ Council deliberating...\n")
     
     result = await agent.run(task)
@@ -63,10 +65,17 @@ async def streaming_example():
     print("\n" + "=" * 60)
     print("WISDOM COUNCIL AGENT - Streaming Example")
     print("=" * 60)
-    
+
     agent = WisdomCouncilAgent()
-    
-    task = "Design a risk assessment methodology for IT projects"
+
+    # Ask user for their task
+    print("\nWhat would you like the Wisdom Council to help you with?")
+    task = input("Your task: ").strip()
+
+    if not task:
+        print("No task provided. Using example task.")
+        task = "Design a risk assessment methodology for IT projects"
+
     print(f"\n📋 Task: {task}\n")
     
     async for event in agent.stream(task):
@@ -134,10 +143,18 @@ async def custom_council_example():
     
     # Create agent with custom council
     agent = WisdomCouncilAgent(council=custom_council)
-    
-    result = await agent.run(
-        "Design an AI governance framework for enterprise deployment"
-    )
+
+    # Ask user for their task
+    print("\nWhat would you like the Wisdom Council to help you with?")
+    task = input("Your task: ").strip()
+
+    if not task:
+        print("No task provided. Using example task.")
+        task = "Design an AI governance framework for enterprise deployment"
+
+    print(f"\n📋 Task: {task}\n")
+
+    result = await agent.run(task)
     
     print(f"\n✅ Result: {result.final_output[:500]}...")
 
@@ -152,12 +169,19 @@ async def resume_example():
     
     # Create checkpointer
     checkpointer = SqliteCheckpointer(db_path="./checkpoints")
-    
+
     agent = WisdomCouncilAgent(checkpointer=checkpointer)
-    
-    task = "Analyze portfolio of 25 projects and create health dashboard"
+
+    # Ask user for their task
+    print("\nWhat would you like the Wisdom Council to help you with?")
+    task = input("Your task: ").strip()
+
+    if not task:
+        print("No task provided. Using example task.")
+        task = "Analyze portfolio of 25 projects and create health dashboard"
+
     thread_id = "demo-thread-001"
-    
+
     print(f"\n📋 Task: {task}")
     print(f"🧵 Thread ID: {thread_id}")
     
