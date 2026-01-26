@@ -21,18 +21,43 @@ from wisdom_council.heads import Architect, Oracle, Guardian, Synthesizer
 from wisdom_council.executor import Executor, SubAgent
 from wisdom_council.memory import MemoryManager
 from wisdom_council.checkpoint import Checkpointer
+from wisdom_council.plan import (
+    Plan,
+    PlanItem,
+    PlanStatus,
+    PlanItemStatus,
+    PlanManager,
+    PlanStorage,
+    FilePlanStorage,
+    PlanApprovalRequired,
+)
 
 __all__ = [
+    # Agent
     "WisdomCouncilAgent",
+    # Council
     "WisdomCouncil",
     "CouncilHead",
     "CouncilDecision",
+    # Heads
     "Architect",
-    "Oracle", 
+    "Oracle",
     "Guardian",
     "Synthesizer",
+    # Execution
     "Executor",
     "SubAgent",
+    # Memory
     "MemoryManager",
+    # Checkpointing
     "Checkpointer",
+    # Plan Management
+    "Plan",
+    "PlanItem",
+    "PlanStatus",
+    "PlanItemStatus",
+    "PlanManager",
+    "PlanStorage",
+    "FilePlanStorage",
+    "PlanApprovalRequired",
 ]

@@ -24,6 +24,7 @@ A multi-head AI agent architecture inspired by The Matrix's Architect and Oracle
 - [Memory System](#-memory-system)
 - [Execution Layer](#-execution-layer)
 - [Checkpointing & Recovery](#-checkpointing--recovery)
+- [Plan Management](#-plan-management)
 - [Extending the System](#-extending-the-system)
 - [API Reference](#-api-reference)
 - [Deployment](#-deployment)
@@ -919,21 +920,296 @@ await agent.restore_checkpoint(
 # recovery.py
 async def recover_and_continue(thread_id: str):
     """Recover from crash and continue execution"""
-    
+
     # Load latest checkpoint
     checkpoint = await checkpointer.get_latest(thread_id)
-    
+
     if checkpoint:
         print(f"Recovering from step {checkpoint.step}")
         print(f"Progress: {checkpoint.progress}%")
-        
+
         # Restore state
         agent = WisdomCouncilAgent(checkpointer=checkpointer)
         result = await agent.resume(thread_id)
-        
+
         return result
     else:
         raise ValueError(f"No checkpoint found for {thread_id}")
+```
+
+---
+
+## 📋 Plan Management
+
+Plans are file-based, persistent project management for AI. Unlike simple in-memory todo lists, Plans:
+
+- **Persist** — Stay on your file system between sessions
+- **Support Dependencies** — Plan item B can wait for item A to finish
+- **Sync Across Sessions** — Multiple instances can share the same plan
+- **Require Approval** — Users can see and approve plans before execution
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PLAN MANAGEMENT                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   1. COUNCIL DELIBERATION                                                   │
+│      └── Creates structured plan from task                                  │
+│                                                                             │
+│   2. PLAN DISPLAY                                                           │
+│      └── Shows plan to user for visibility                                  │
+│      └── Formatted display with progress bar                                │
+│                                                                             │
+│   3. USER APPROVAL                                                          │
+│      └── User reviews and approves/rejects                                  │
+│      └── Plans persist until approved                                       │
+│                                                                             │
+│   4. EXECUTION                                                              │
+│      └── Items execute respecting dependencies                              │
+│      └── Progress tracked in real-time                                      │
+│                                                                             │
+│   Storage: ./plans/*.json (file-based, cross-session)                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Basic Usage
+
+```python
+from wisdom_council import WisdomCouncilAgent, PlanApprovalRequired
+
+async def main():
+    agent = WisdomCouncilAgent(require_plan_approval=True)
+
+    # Create a plan from a task
+    plan = await agent.create_plan(
+        "Deploy application to production with zero downtime"
+    )
+
+    # Display the plan for user review
+    print(await agent.show_plan())
+
+    # Output:
+    # ============================================================
+    # PLAN: Plan: Deploy application to production with zero d...
+    # ============================================================
+    # ID: a1b2c3d4
+    # Status: [AWAITING APPROVAL]
+    # Description: Deploy application to production with zero downtime
+    #
+    # Progress: [------------------------------] 0.0%
+    #          0/5 items completed
+    #
+    # ------------------------------------------------------------
+    # PLAN ITEMS:
+    # ------------------------------------------------------------
+    # 1. [ ] [item-1] Run test suite
+    #    Execute all unit and integration tests
+    #
+    # 2. [ ] [item-2] Build production image
+    #    Build and tag Docker image for production
+    #
+    # 3. [ ] [item-3] Deploy to staging
+    #    Deploy to staging environment for final verification
+    # ...
+    # ------------------------------------------------------------
+    #
+    # >>> AWAITING YOUR APPROVAL <<<
+    # Use plan_manager.approve(plan_id) to approve
+    # Use plan_manager.reject(plan_id, reason) to reject
+    # ============================================================
+
+    # Approve the plan
+    await agent.approve_plan(comment="Looks good, proceed!")
+
+    # Execute the approved plan
+    result = await agent.execute_plan()
+    print(result.final_output)
+```
+
+### Plan with Dependencies
+
+```python
+from wisdom_council import PlanManager
+
+async def main():
+    manager = PlanManager(plans_dir="./plans")
+
+    # Create a plan with explicit dependencies
+    plan = await manager.create_plan(
+        name="Database Migration",
+        description="Migrate database with zero downtime",
+        auto_submit=False,
+        items=[
+            {
+                "title": "Backup database",
+                "description": "Create full backup",
+                "temp_id": "backup",
+                "priority": 1
+            },
+            {
+                "title": "Apply migrations",
+                "description": "Run schema migrations",
+                "temp_id": "migrate",
+                "dependencies": ["backup"]  # Waits for backup
+            },
+            {
+                "title": "Verify data",
+                "description": "Run integrity checks",
+                "temp_id": "verify",
+                "dependencies": ["migrate"]  # Waits for migrate
+            },
+            {
+                "title": "Update config",
+                "description": "Point app to new schema",
+                "temp_id": "config",
+                "dependencies": ["verify"]  # Waits for verify
+            }
+        ]
+    )
+
+    # Submit for approval
+    await manager.submit_for_approval(plan.id)
+    print(plan.display())
+
+    # Approve
+    await manager.approve(plan.id)
+
+    # Execute items one by one
+    while True:
+        item = await manager.get_next_item(plan.id)
+        if not item:
+            break
+
+        await manager.start_item(plan.id, item.id)
+        # ... execute item ...
+        await manager.complete_item(plan.id, item.id, result="Done")
+```
+
+### Direct Plan Manager Usage
+
+```python
+from wisdom_council import PlanManager, PlanStatus
+
+async def main():
+    manager = PlanManager(plans_dir="./my_plans")
+
+    # List all plans
+    all_plans = await manager.list_plans()
+
+    # List plans awaiting approval
+    pending = await manager.list_plans(status=PlanStatus.AWAITING_APPROVAL)
+
+    # Display all plans summary
+    print(await manager.display_all_plans())
+
+    # Get specific plan
+    plan = await manager.get_plan("a1b2c3d4")
+
+    # Reject a plan
+    await manager.reject(plan.id, reason="Need more detail on step 3")
+
+    # Check progress
+    progress = plan.get_progress()
+    print(f"Completed: {progress['completed']}/{progress['total']}")
+    print(f"Percentage: {progress['percentage']}%")
+```
+
+### Plan Data Structures
+
+```python
+from wisdom_council import Plan, PlanItem, PlanStatus, PlanItemStatus
+
+# Plan statuses
+PlanStatus.DRAFT              # Just created
+PlanStatus.AWAITING_APPROVAL  # Submitted for user review
+PlanStatus.APPROVED           # User approved, ready to execute
+PlanStatus.REJECTED           # User rejected
+PlanStatus.IN_PROGRESS        # Currently executing
+PlanStatus.COMPLETED          # All items done
+PlanStatus.FAILED             # Execution failed
+
+# Plan item statuses
+PlanItemStatus.PENDING        # Not started
+PlanItemStatus.IN_PROGRESS    # Currently executing
+PlanItemStatus.COMPLETED      # Done
+PlanItemStatus.BLOCKED        # Dependency failed
+PlanItemStatus.FAILED         # Execution failed
+PlanItemStatus.SKIPPED        # Skipped by user
+```
+
+### Integration with Council
+
+Plans integrate seamlessly with the council deliberation process:
+
+```python
+async def run_with_plan(self, task: str) -> AgentResult:
+    """
+    Full workflow: deliberate → create plan → approve → execute
+    """
+    # 1. Council deliberates on the task
+    decision = await self.council.deliberate(task, context)
+
+    # 2. Parse decision into structured plan items
+    plan = await self.plan_manager.create_plan(
+        name=f"Plan: {task[:50]}",
+        description=task,
+        items=self._parse_plan_to_items(decision.plan),
+        context={"deliberation": decision}
+    )
+
+    # 3. Display for user approval
+    print(plan.display())
+
+    # 4. Wait for approval (raises PlanApprovalRequired if not approved)
+    if plan.status == PlanStatus.AWAITING_APPROVAL:
+        raise PlanApprovalRequired(plan)
+
+    # 5. Execute approved plan
+    return await self.execute_plan(plan.id)
+```
+
+### Plan Storage
+
+Plans are stored as JSON files for easy inspection and cross-session access:
+
+```
+./plans/
+├── a1b2c3d4.json    # Plan: Deploy application
+├── e5f6g7h8.json    # Plan: Database migration
+└── i9j0k1l2.json    # Plan: Refactor authentication
+```
+
+Each file contains the complete plan state:
+
+```json
+{
+  "id": "a1b2c3d4",
+  "name": "Plan: Deploy application",
+  "status": "awaiting_approval",
+  "items": [
+    {
+      "id": "item-1",
+      "title": "Run tests",
+      "description": "Execute test suite",
+      "status": "pending",
+      "dependencies": [],
+      "priority": 1
+    },
+    {
+      "id": "item-2",
+      "title": "Build image",
+      "description": "Build Docker image",
+      "status": "pending",
+      "dependencies": ["item-1"],
+      "priority": 2
+    }
+  ],
+  "created_at": "2024-01-15T10:30:00",
+  "updated_at": "2024-01-15T10:35:00"
+}
 ```
 
 ---
@@ -1023,24 +1299,28 @@ class SocraticDialogue(CommunicationPattern):
 ```python
 class WisdomCouncilAgent:
     """Main agent class that orchestrates the council and execution."""
-    
+
     def __init__(
         self,
         config_path: str = None,
         council: WisdomCouncil = None,
         memory: MemoryManager = None,
         checkpointer: Checkpointer = None,
-        require_human_approval: list[str] = None
+        plan_manager: PlanManager = None,
+        require_human_approval: list[str] = None,
+        require_plan_approval: bool = True
     ):
         """
         Initialize the Wisdom Council Agent.
-        
+
         Args:
             config_path: Path to YAML configuration file
             council: Custom WisdomCouncil instance
             memory: Custom MemoryManager instance
             checkpointer: Custom Checkpointer instance
+            plan_manager: Custom PlanManager for persistent plans
             require_human_approval: List of action types requiring approval
+            require_plan_approval: Whether plans require user approval
         """
         pass
     
@@ -1078,6 +1358,60 @@ class WisdomCouncilAgent:
     
     async def resume(self, thread_id: str) -> AgentResult:
         """Resume execution from last checkpoint."""
+        pass
+
+    # Plan Management Methods
+
+    async def create_plan(
+        self,
+        task: str,
+        context: dict = None,
+        auto_submit: bool = True
+    ) -> Plan:
+        """
+        Create a plan for a task through council deliberation.
+
+        Args:
+            task: The task description
+            context: Additional context
+            auto_submit: Automatically submit for user approval
+
+        Returns:
+            The created Plan (awaiting approval)
+        """
+        pass
+
+    async def show_plan(self, plan_id: str = None) -> str:
+        """Display a plan for user visibility."""
+        pass
+
+    async def approve_plan(self, plan_id: str = None, comment: str = None) -> Plan:
+        """Approve a plan for execution."""
+        pass
+
+    async def reject_plan(self, plan_id: str = None, reason: str = None) -> Plan:
+        """Reject a plan."""
+        pass
+
+    async def execute_plan(self, plan_id: str = None, thread_id: str = None) -> AgentResult:
+        """Execute an approved plan."""
+        pass
+
+    async def run_with_plan(
+        self,
+        task: str,
+        context: dict = None,
+        thread_id: str = None,
+        wait_for_approval: bool = True
+    ) -> AgentResult:
+        """
+        Run a task with a visible, persistent plan requiring user approval.
+
+        This is the recommended way to run complex tasks.
+
+        Raises:
+            PlanApprovalRequired: If plan needs approval and wait_for_approval=False
+        """
         pass
 ```
 
@@ -1151,6 +1485,87 @@ class CouncilHead:
     
     async def evaluate_constitution(self, plan: dict) -> ConstitutionCheck:
         """Check if plan satisfies this head's constitution."""
+        pass
+```
+
+### PlanManager
+
+```python
+class PlanManager:
+    """High-level plan management with user visibility and approval workflow."""
+
+    def __init__(
+        self,
+        storage: PlanStorage = None,
+        plans_dir: str = "./plans",
+        on_approval_requested: Callable = None,
+        on_plan_updated: Callable = None
+    ):
+        """
+        Initialize the plan manager.
+
+        Args:
+            storage: Custom storage backend (defaults to FilePlanStorage)
+            plans_dir: Directory for file storage
+            on_approval_requested: Callback when approval is requested
+            on_plan_updated: Callback when plan is updated
+        """
+        pass
+
+    async def create_plan(
+        self,
+        name: str,
+        description: str,
+        items: list[dict] = None,
+        created_by: str = None,
+        auto_submit: bool = True,
+        context: dict = None
+    ) -> Plan:
+        """Create a new plan."""
+        pass
+
+    async def get_plan(self, plan_id: str) -> Optional[Plan]:
+        """Get a plan by ID."""
+        pass
+
+    async def list_plans(self, status: PlanStatus = None) -> list[Plan]:
+        """List all plans, optionally filtered by status."""
+        pass
+
+    async def submit_for_approval(self, plan_id: str) -> Plan:
+        """Submit a plan for user approval."""
+        pass
+
+    async def approve(self, plan_id: str, approved_by: str = "user", comment: str = None) -> Plan:
+        """Approve a plan."""
+        pass
+
+    async def reject(self, plan_id: str, reason: str, rejected_by: str = "user") -> Plan:
+        """Reject a plan."""
+        pass
+
+    async def start_item(self, plan_id: str, item_id: str) -> PlanItem:
+        """Mark a plan item as in progress."""
+        pass
+
+    async def complete_item(self, plan_id: str, item_id: str, result: str = None) -> PlanItem:
+        """Mark a plan item as completed."""
+        pass
+
+    async def fail_item(self, plan_id: str, item_id: str, error: str) -> PlanItem:
+        """Mark a plan item as failed."""
+        pass
+
+    async def get_next_item(self, plan_id: str) -> Optional[PlanItem]:
+        """Get the next item ready to execute."""
+        pass
+
+    async def display_plan(self, plan_id: str, show_details: bool = True) -> str:
+        """Get a formatted display of the plan for user visibility."""
+        pass
+
+    async def display_all_plans(self, status: PlanStatus = None) -> str:
+        """Display a summary of all plans."""
         pass
 ```
 
