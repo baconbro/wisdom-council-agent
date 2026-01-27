@@ -10,7 +10,7 @@ from wisdom_council import WisdomCouncilAgent
 
 
 async def basic_example():
-    """Basic usage example"""
+    """Basic usage example with full transparency"""
     print("=" * 60)
     print("WISDOM COUNCIL AGENT - Basic Example")
     print("=" * 60)
@@ -30,9 +30,9 @@ async def basic_example():
     # Run the task
     print("\n📋 Task:", task)
     print("\n🏛️ Council deliberating...\n")
-    
+
     result = await agent.run(task)
-    
+
     # Display results
     print("=" * 60)
     print("RESULTS")
@@ -40,30 +40,95 @@ async def basic_example():
     print(f"\n📊 Final Output:\n{result.final_output}")
     print(f"\n⏱️ Execution Time: {result.execution_time:.2f}s")
     print(f"🔢 Tokens Used: {result.tokens_used}")
-    
-    # Show deliberation summary
+
+    # Show FULL deliberation details
     print("\n" + "=" * 60)
-    print("COUNCIL DELIBERATION SUMMARY")
+    print("COUNCIL DELIBERATION (FULL DETAILS)")
     print("=" * 60)
-    
-    for round in result.deliberation.rounds:
-        print(f"\n--- Round {round.number} ---")
-        for head, proposal in round.proposals.items():
-            print(f"  {head}: {proposal.content[:100]}...")
-        print(f"  Consensus: {'Yes' if round.has_consensus else 'No'}")
-    
-    print(f"\n🔒 Guardian Review: {'Approved' if result.deliberation.guardian_review.passed else 'VETOED'}")
-    
+
+    for round_data in result.deliberation.rounds:
+        print(f"\n{'─' * 50}")
+        print(f"ROUND {round_data.number}")
+        print(f"{'─' * 50}")
+
+        # Show FULL proposals
+        print("\n📝 PROPOSALS:\n")
+        for head, proposal in round_data.proposals.items():
+            print(f"  🎭 {head}:")
+            print(f"     Proposal: {proposal.content}")
+            if proposal.reasoning:
+                print(f"     Reasoning: {proposal.reasoning}")
+            if proposal.concerns:
+                print(f"     Concerns: {proposal.concerns}")
+            if proposal.questions:
+                print(f"     Questions: {proposal.questions}")
+            print(f"     Confidence: {proposal.confidence:.0%}")
+            print()
+
+        # Show FULL critiques
+        if round_data.critiques:
+            print("\n💬 CRITIQUES:\n")
+            for head, critique in round_data.critiques.items():
+                print(f"  🎭 {head}'s Critique:")
+                if critique.agreements:
+                    print(f"     ✓ Agrees with: {critique.agreements}")
+                if critique.concerns:
+                    print(f"     ⚠ Concerns: {critique.concerns}")
+                if critique.suggested_changes:
+                    print(f"     → Suggestions: {critique.suggested_changes}")
+                if critique.questions:
+                    print(f"     ? Questions: {critique.questions}")
+                print()
+
+        print(f"  📊 Consensus: {'Yes ✓' if round_data.has_consensus else 'No ✗'}")
+
+    # Show synthesis reasoning
+    if result.deliberation.synthesis_reasoning:
+        print(f"\n{'─' * 50}")
+        print("🔮 SYNTHESIS REASONING")
+        print(f"{'─' * 50}")
+        print(f"  {result.deliberation.synthesis_reasoning}")
+
+    # Guardian review with FULL details
+    print(f"\n{'─' * 50}")
+    print("🛡️ GUARDIAN REVIEW")
+    print(f"{'─' * 50}")
+
+    if result.deliberation.guardian_review:
+        review = result.deliberation.guardian_review
+        if review.passed:
+            print("  ✅ Status: APPROVED")
+        else:
+            print("  ❌ Status: VETOED")
+
+        # ALWAYS show violations when vetoed - this is the key transparency fix!
+        if review.violations:
+            print("\n  🚫 CONSTITUTIONAL VIOLATIONS:")
+            for violation in review.violations:
+                print(f"     ✗ {violation}")
+
+        if review.warnings:
+            print("\n  ⚠️ WARNINGS:")
+            for warning in review.warnings:
+                print(f"     ! {warning}")
+    else:
+        print("  ℹ️ No Guardian review performed")
+
+    # Show dissents
     if result.deliberation.dissents:
-        print("\n⚠️ Dissents:")
+        print(f"\n{'─' * 50}")
+        print("📢 REMAINING DISSENTS")
+        print(f"{'─' * 50}")
         for dissent in result.deliberation.dissents:
-            print(f"  - {dissent['head']}: {dissent['concerns']}")
+            print(f"  🎭 {dissent['head']}:")
+            for concern in dissent['concerns']:
+                print(f"     - {concern}")
 
 
 async def streaming_example():
-    """Streaming output example"""
+    """Streaming output example with full transparency"""
     print("\n" + "=" * 60)
-    print("WISDOM COUNCIL AGENT - Streaming Example")
+    print("WISDOM COUNCIL AGENT - Streaming Example (LIVE)")
     print("=" * 60)
 
     agent = WisdomCouncilAgent()
@@ -76,17 +141,37 @@ async def streaming_example():
         print("No task provided. Using example task.")
         task = "Design a risk assessment methodology for IT projects"
 
-    print(f"\n📋 Task: {task}\n")
-    
+    print(f"\n📋 Task: {task}")
+    print("\n🔴 LIVE DELIBERATION - Watch the council think in real-time:\n")
+    print("─" * 60)
+
     async for event in agent.stream(task):
         if event.type == "council_deliberation":
-            print(f"🗣️ [{event.head}]: {event.content[:150]}...")
+            head = event.head or "Council"
+            # Show FULL content, not truncated
+            print(f"\n🎭 [{head}]")
+            print(f"   {event.content}")
+
+            # Show metadata if available (reasoning, concerns, etc.)
+            if event.metadata:
+                if "reasoning" in event.metadata and event.metadata["reasoning"]:
+                    print(f"   💭 Reasoning: {event.metadata['reasoning']}")
+                if "concerns" in event.metadata and event.metadata["concerns"]:
+                    print(f"   ⚠️ Concerns: {event.metadata['concerns']}")
+
         elif event.type == "status":
-            print(f"📌 {event.content}")
+            print(f"\n📌 {event.content}")
+
         elif event.type == "execution_step":
-            print(f"⚙️ Step {event.step}: {event.content[:100]}...")
+            step = event.step or "?"
+            print(f"\n⚙️ [Step {step}]")
+            print(f"   {event.content}")
+
         elif event.type == "final_output":
-            print(f"\n✅ Result: {event.content[:500]}...")
+            print("\n" + "=" * 60)
+            print("✅ FINAL RESULT")
+            print("=" * 60)
+            print(f"\n{event.content}")
 
 
 async def custom_council_example():
@@ -358,24 +443,34 @@ async def resume_example():
 
 
 async def main():
-    """Run all examples"""
+    """Run examples with full transparency"""
     print("\n" + "🏛️ " * 20)
-    print("\n   WISDOM COUNCIL AGENT - EXAMPLES\n")
+    print("\n   WISDOM COUNCIL AGENT\n")
     print("🏛️ " * 20 + "\n")
 
-    # Run basic example
-    await basic_example()
+    print("Choose how to run:")
+    print("  1. Basic (shows full deliberation after completion)")
+    print("  2. Streaming (watch deliberation in real-time) [RECOMMENDED]")
+    print("  3. Plan example (with approval workflow)")
+    print()
+    choice = input("Enter choice (1-3) [default: 2]: ").strip() or "2"
 
-    # Uncomment to run other examples:
-    # await streaming_example()
-    # await custom_council_example()
-    # await plan_example()
-    # await plan_with_dependencies_example()
-    # await resume_example()
+    if choice == "1":
+        await basic_example()
+    elif choice == "2":
+        await streaming_example()
+    elif choice == "3":
+        await plan_example()
+    else:
+        print(f"Invalid choice: {choice}")
+        return
 
     print("\n" + "=" * 60)
-    print("Examples complete!")
+    print("Complete!")
     print("=" * 60)
+    print("\nTIP: For the full CLI with more options, install and run:")
+    print("     pip install -e .")
+    print("     wisdom-council --help")
 
 
 if __name__ == "__main__":

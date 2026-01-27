@@ -68,7 +68,7 @@ all = [
 ]
 
 [project.scripts]
-wisdom-council = "wisdom_council.cli:main"
+wisdom-council = "wisdom_council.cli:cli"
 
 [project.urls]
 
