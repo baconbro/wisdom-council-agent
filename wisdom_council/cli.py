@@ -219,7 +219,22 @@ async def run_streaming(agent: WisdomCouncilAgent, task: str, verbosity: Verbosi
     current_round = 0
 
     async for event in agent.stream(task):
-        if event.type == "status":
+        if event.type == "memory_retrieval":
+            # Show what memories were retrieved
+            memories = event.metadata.get("memories", [])
+            count = event.metadata.get("count", 0)
+            print(f"\n{Colors.INFO}🧠 MEMORY RETRIEVAL:{Colors.RESET}")
+            if count == 0:
+                print(f"   {Colors.DIM}(No relevant memories found - fresh context){Colors.RESET}")
+            else:
+                print(f"   Found {count} relevant memories:")
+                for i, mem in enumerate(memories, 1):
+                    content_preview = mem['content'][:80] + "..." if len(mem['content']) > 80 else mem['content']
+                    print(f"   {i}. [{Colors.BOLD}{mem['source']}{Colors.RESET}] {content_preview}")
+                    print(f"      {Colors.DIM}Importance: {mem['importance']:.0%} | {mem['timestamp']}{Colors.RESET}")
+            print()
+
+        elif event.type == "status":
             print(f"{Colors.INFO}[STATUS]{Colors.RESET} {event.content}")
 
         elif event.type == "council_deliberation":

@@ -146,7 +146,21 @@ async def streaming_example():
     print("─" * 60)
 
     async for event in agent.stream(task):
-        if event.type == "council_deliberation":
+        if event.type == "memory_retrieval":
+            # Show what memories were retrieved
+            memories = event.metadata.get("memories", [])
+            count = event.metadata.get("count", 0)
+            print(f"\n🧠 MEMORY RETRIEVAL:")
+            if count == 0:
+                print("   (No relevant memories found - this is a fresh context)")
+            else:
+                print(f"   Found {count} relevant memories:")
+                for i, mem in enumerate(memories, 1):
+                    print(f"   {i}. [{mem['source']}] {mem['content'][:100]}...")
+                    print(f"      Importance: {mem['importance']:.0%} | {mem['timestamp']}")
+            print()
+
+        elif event.type == "council_deliberation":
             head = event.head or "Council"
             # Show FULL content, not truncated
             print(f"\n🎭 [{head}]")

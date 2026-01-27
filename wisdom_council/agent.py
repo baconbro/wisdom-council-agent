@@ -392,6 +392,23 @@ class WisdomCouncilAgent:
         )
         memories = await self.memory.retrieve(task, limit=10)
         context["memories"] = memories
+
+        # Emit memory retrieval event with details
+        yield AgentEvent(
+            type="memory_retrieval",
+            content=f"Retrieved {len(memories)} memories",
+            metadata={
+                "memories": [
+                    {
+                        "content": m.content,
+                        "importance": m.importance,
+                        "source": m.source,
+                        "timestamp": m.timestamp
+                    } for m in memories
+                ] if memories else [],
+                "count": len(memories)
+            }
+        )
         
         # 2. Council deliberation - stream each head's contribution
         yield AgentEvent(
