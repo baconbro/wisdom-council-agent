@@ -475,15 +475,59 @@ class WisdomCouncil:
             content="Creating unified plan...",
             event_type="status"
         )
-        
+
         synthesis = await self._synthesize(task, proposals, critiques)
-        
+        total_tokens = synthesis.get("tokens_used", 0)
+
         yield StreamEvent(
             head="Synthesizer",
             content=synthesis["reasoning"],
             event_type="synthesis"
         )
-    
+
+        # Guardian veto check
+        guardian_review = None
+        if self.guardian:
+            yield StreamEvent(
+                head="Guardian",
+                content="Reviewing plan against constitution...",
+                event_type="status"
+            )
+            guardian_review = await self.guardian.evaluate_constitution(synthesis["plan"])
+            total_tokens += 500  # Estimate
+
+            if not guardian_review.passed:
+                yield StreamEvent(
+                    head="Guardian",
+                    content=f"VETO: {guardian_review.violations}",
+                    event_type="veto"
+                )
+                # Attempt to address veto
+                synthesis = await self._address_veto(synthesis, guardian_review)
+                total_tokens += synthesis.get("tokens_used", 0)
+                # Re-check
+                guardian_review = await self.guardian.evaluate_constitution(synthesis["plan"])
+            else:
+                yield StreamEvent(
+                    head="Guardian",
+                    content="Plan approved by Guardian",
+                    event_type="approval"
+                )
+
+        # Collect any remaining dissents
+        dissents = self._collect_dissents(critiques)
+
+        # Create and store the final decision
+        self._current_decision = CouncilDecision(
+            approved=guardian_review.passed if guardian_review else True,
+            plan=synthesis["plan"],
+            dissents=dissents,
+            synthesis_reasoning=synthesis["reasoning"],
+            rounds=self._deliberation_rounds,
+            guardian_review=guardian_review,
+            tokens_used=total_tokens
+        )
+
     async def get_decision(self) -> CouncilDecision:
         """Get the final decision after streaming"""
         return self._current_decision
