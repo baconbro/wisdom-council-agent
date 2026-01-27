@@ -41,6 +41,29 @@ async def basic_example():
     print(f"\n⏱️ Execution Time: {result.execution_time:.2f}s")
     print(f"🔢 Tokens Used: {result.tokens_used}")
 
+    # Show MEMORY details
+    print("\n" + "=" * 60)
+    print("MEMORY DETAILS")
+    print("=" * 60)
+
+    for trace in result.execution_trace:
+        if trace.get("phase") == "memory_retrieval":
+            print(f"\n🧠 RETRIEVED MEMORIES: {trace.get('count', 0)} found")
+            memories = trace.get("memories", [])
+            if memories:
+                for i, mem in enumerate(memories, 1):
+                    print(f"   [{i}] {mem['content']}")
+                    print(f"       Source: {mem['source']} | Importance: {mem['importance']:.1%} | Time: {mem['timestamp']}")
+            else:
+                print("   (No relevant memories found)")
+
+        elif trace.get("phase") == "memory_storage":
+            print(f"\n💾 STORED TO MEMORY:")
+            print(f"   Task: {trace.get('task_summary', 'N/A')}")
+            print(f"   Decision approved: {trace.get('decision_approved', 'N/A')}")
+            stored_to = trace.get('stored_to', [])
+            print(f"   Stored to: {', '.join(stored_to) if stored_to else 'default'}")
+
     # Show FULL deliberation details
     print("\n" + "=" * 60)
     print("COUNCIL DELIBERATION (FULL DETAILS)")
@@ -158,6 +181,25 @@ async def streaming_example():
                     print(f"   💭 Reasoning: {event.metadata['reasoning']}")
                 if "concerns" in event.metadata and event.metadata["concerns"]:
                     print(f"   ⚠️ Concerns: {event.metadata['concerns']}")
+
+        elif event.type == "memory_retrieved":
+            # Show memory retrieval details
+            print(f"\n🧠 MEMORY RETRIEVED: {event.content}")
+            if event.metadata and event.metadata.get("memories"):
+                for i, mem in enumerate(event.metadata["memories"], 1):
+                    print(f"   [{i}] {mem['content']}")
+                    print(f"       Source: {mem['source']} | Importance: {mem['importance']:.1%} | Time: {mem['timestamp']}")
+            else:
+                print("   (No relevant memories found)")
+
+        elif event.type == "memory_stored":
+            # Show memory storage details
+            print(f"\n💾 MEMORY STORED: {event.content}")
+            if event.metadata:
+                print(f"   Task: {event.metadata.get('task_summary', 'N/A')}")
+                print(f"   Decision approved: {event.metadata.get('decision_approved', 'N/A')}")
+                stored_to = event.metadata.get('stored_to', [])
+                print(f"   Stored to: {', '.join(stored_to) if stored_to else 'default'}")
 
         elif event.type == "status":
             print(f"\n📌 {event.content}")

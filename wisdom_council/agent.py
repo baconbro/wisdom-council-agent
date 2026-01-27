@@ -290,7 +290,20 @@ class WisdomCouncilAgent:
             # 1. Retrieve relevant memories
             memories = await self.memory.retrieve(task, limit=10)
             context["memories"] = memories
-            
+            execution_trace.append({
+                "phase": "memory_retrieval",
+                "count": len(memories),
+                "memories": [
+                    {
+                        "content": m.content[:200] + "..." if len(m.content) > 200 else m.content,
+                        "importance": m.importance,
+                        "source": m.source,
+                        "timestamp": m.timestamp
+                    }
+                    for m in memories
+                ]
+            })
+
             # 2. Council deliberates on approach
             decision = await self.council.deliberate(task, context)
             tokens_used += decision.tokens_used
@@ -344,7 +357,13 @@ class WisdomCouncilAgent:
                 decision=decision,
                 results=results
             )
-            
+            execution_trace.append({
+                "phase": "memory_storage",
+                "task_summary": task[:200] + "..." if len(task) > 200 else task,
+                "decision_approved": decision.approved,
+                "stored_to": ["short_term", "long_term"] if self.memory.config.get("long_term") else ["short_term"]
+            })
+
             execution_time = time.time() - start_time
             
             return AgentResult(
@@ -392,6 +411,24 @@ class WisdomCouncilAgent:
         )
         memories = await self.memory.retrieve(task, limit=10)
         context["memories"] = memories
+
+        # Emit memory retrieval details
+        yield AgentEvent(
+            type="memory_retrieved",
+            content=f"Retrieved {len(memories)} memories",
+            metadata={
+                "count": len(memories),
+                "memories": [
+                    {
+                        "content": m.content[:200] + "..." if len(m.content) > 200 else m.content,
+                        "importance": m.importance,
+                        "source": m.source,
+                        "timestamp": m.timestamp
+                    }
+                    for m in memories
+                ]
+            }
+        )
         
         # 2. Council deliberation - stream each head's contribution
         yield AgentEvent(
@@ -435,6 +472,30 @@ class WisdomCouncilAgent:
         
         # 4. Final output
         results = await self.executor.get_results()
+
+        # 5. Store learnings in memory
+        yield AgentEvent(
+            type="status",
+            content="Storing learnings to memory..."
+        )
+        await self.memory.store(
+            task=task,
+            decision=decision,
+            results=results
+        )
+
+        # Emit memory storage details
+        yield AgentEvent(
+            type="memory_stored",
+            content="Stored task learnings to memory",
+            metadata={
+                "task_summary": task[:200] + "..." if len(task) > 200 else task,
+                "decision_approved": decision.approved,
+                "has_results": results is not None,
+                "stored_to": ["short_term", "long_term"] if self.memory.config.get("long_term") else ["short_term"]
+            }
+        )
+
         yield AgentEvent(
             type="final_output",
             content=results.final_output
