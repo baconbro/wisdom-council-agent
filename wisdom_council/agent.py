@@ -470,7 +470,14 @@ class WisdomCouncilAgent:
         
         # Get final decision
         decision = await self.council.get_decision()
-        
+
+        if decision is None:
+            yield AgentEvent(
+                type="final_output",
+                content="Error: Council deliberation did not produce a decision"
+            )
+            return
+
         if not decision.approved:
             yield AgentEvent(
                 type="final_output",
