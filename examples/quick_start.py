@@ -164,12 +164,40 @@ async def streaming_example():
         print("No task provided. Using example task.")
         task = "Design a risk assessment methodology for IT projects"
 
+    # Ask if user wants to enable thinking mode
+    print("\nEnable thinking mode? (shows model's reasoning process)")
+    print("  This requires models that support thinking (e.g., qwen3, deepseek-r1)")
+    enable_thinking = input("Enable thinking? (y/n) [default: n]: ").strip().lower() == 'y'
+
     print(f"\n📋 Task: {task}")
+    if enable_thinking:
+        print("🧠 Thinking mode: ENABLED (streaming reasoning tokens)")
     print("\n🔴 LIVE DELIBERATION - Watch the council think in real-time:\n")
     print("─" * 60)
 
-    async for event in agent.stream(task):
-        if event.type == "council_deliberation":
+    # Track current head for thinking display
+    current_thinking_head = None
+
+    async for event in agent.stream(task, enable_thinking=enable_thinking):
+        if event.type == "thinking":
+            # Stream thinking/reasoning tokens in real-time
+            head = event.head or "Unknown"
+            if current_thinking_head != head:
+                current_thinking_head = head
+                print(f"\n💭 [{head}] THINKING:", end="", flush=True)
+            # Print thinking tokens as they arrive (no newline)
+            print(event.content, end="", flush=True)
+
+        elif event.type == "token":
+            # Stream content tokens in real-time (no newline)
+            print(event.content, end="", flush=True)
+
+        elif event.type == "council_deliberation":
+            # End any ongoing thinking stream
+            if current_thinking_head:
+                print()  # Newline after thinking
+                current_thinking_head = None
+
             head = event.head or "Council"
             # Show FULL content, not truncated
             print(f"\n🎭 [{head}]")
@@ -202,6 +230,10 @@ async def streaming_example():
                 print(f"   Stored to: {', '.join(stored_to) if stored_to else 'default'}")
 
         elif event.type == "status":
+            # End any ongoing thinking stream
+            if current_thinking_head:
+                print()  # Newline after thinking
+                current_thinking_head = None
             print(f"\n📌 {event.content}")
 
         elif event.type == "execution_step":

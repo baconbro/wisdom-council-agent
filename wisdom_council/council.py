@@ -134,8 +134,9 @@ class StreamEvent:
     """Event during streaming deliberation"""
     head: str
     content: str
-    event_type: str  # proposal, critique, synthesis
+    event_type: str  # proposal, critique, synthesis, thinking, token, status
     metadata: dict = field(default_factory=dict)
+    is_complete: bool = False  # True when this is the final chunk of a stream
 
 
 class CouncilHead(ABC):
@@ -176,12 +177,14 @@ class CouncilHead(ABC):
     def _init_llm(self):
         """Initialize the LLM client based on provider"""
         provider = self.config.get("provider", "ollama")
-        
+        enable_thinking = self.config.get("enable_thinking", False)
+
         if provider == "ollama":
             from wisdom_council.llm import OllamaClient
             return OllamaClient(
                 model=self.model,
-                temperature=self.temperature
+                temperature=self.temperature,
+                enable_thinking=enable_thinking
             )
         elif provider == "openai":
             from wisdom_council.llm import OpenAIClient
@@ -212,7 +215,53 @@ class CouncilHead(ABC):
     async def revise(self, proposal: Proposal, critiques: list[Critique]) -> Proposal:
         """Revise proposal based on critiques"""
         pass
-    
+
+    async def stream_llm(
+        self,
+        prompt: str,
+        enable_thinking: bool = None
+    ) -> AsyncGenerator[StreamEvent, None]:
+        """
+        Stream LLM response with thinking support.
+
+        Yields StreamEvent for each chunk, distinguishing between
+        thinking tokens and content tokens.
+
+        Args:
+            prompt: The user prompt to send
+            enable_thinking: Enable thinking mode (uses LLM default if None)
+
+        Yields:
+            StreamEvent with event_type "thinking" or "token"
+        """
+        full_response = ""
+        async for chunk in self._llm.stream_invoke(
+            system_prompt=self.system_prompt,
+            user_prompt=prompt,
+            enable_thinking=enable_thinking
+        ):
+            if chunk.chunk_type == "done":
+                yield StreamEvent(
+                    head=self.name,
+                    content=full_response,
+                    event_type="complete",
+                    is_complete=True
+                )
+                break
+            elif chunk.chunk_type == "thinking":
+                yield StreamEvent(
+                    head=self.name,
+                    content=chunk.content,
+                    event_type="thinking"
+                )
+            else:
+                full_response += chunk.content
+                yield StreamEvent(
+                    head=self.name,
+                    content=chunk.content,
+                    event_type="token"
+                )
+
     async def evaluate_constitution(self, plan: dict) -> ConstitutionCheck:
         """Check if plan satisfies this head's constitution"""
         prompt = f"""
@@ -393,16 +442,22 @@ class WisdomCouncil:
     async def stream_deliberate(
         self,
         task: str,
-        context: dict
+        context: dict,
+        enable_thinking: bool = False
     ) -> AsyncGenerator[StreamEvent, None]:
         """
         Stream deliberation events as they occur.
-        
+
+        Args:
+            task: The task to deliberate on
+            context: Additional context
+            enable_thinking: If True, stream thinking/reasoning tokens in real-time
+
         Yields:
-            StreamEvent for each head's contribution
+            StreamEvent for each head's contribution, including thinking tokens
         """
         self._deliberation_rounds = []
-        
+
         # Round 1: Stream proposals
         proposals = {}
         for head in self.heads:
@@ -411,15 +466,43 @@ class WisdomCouncil:
                 content=f"{head.name} is formulating proposal...",
                 event_type="status"
             )
-            
-            proposal = await head.propose(task, context)
-            proposals[head.name] = proposal
-            
+
+            if enable_thinking:
+                # Stream thinking and content tokens
+                prompt = head._build_propose_prompt(task, context)
+                full_response = ""
+
+                async for event in head.stream_llm(prompt, enable_thinking=True):
+                    if event.event_type == "thinking":
+                        yield StreamEvent(
+                            head=head.name,
+                            content=event.content,
+                            event_type="thinking"
+                        )
+                    elif event.event_type == "token":
+                        yield StreamEvent(
+                            head=head.name,
+                            content=event.content,
+                            event_type="token"
+                        )
+                        full_response += event.content
+                    elif event.is_complete:
+                        full_response = event.content
+
+                # Parse the full response into a Proposal
+                proposal = head._parse_proposal(full_response)
+                proposals[head.name] = proposal
+            else:
+                # Non-streaming: get complete proposal at once
+                proposal = await head.propose(task, context)
+                proposals[head.name] = proposal
+
             yield StreamEvent(
                 head=head.name,
                 content=proposal.content,
                 event_type="proposal",
-                metadata={"reasoning": proposal.reasoning}
+                metadata={"reasoning": proposal.reasoning},
+                is_complete=True
             )
         
         # Rounds 2-N: Stream critiques and revisions

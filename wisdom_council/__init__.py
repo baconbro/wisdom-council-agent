@@ -16,11 +16,12 @@ __author__ = "Your Name"
 __license__ = "MIT"
 
 from wisdom_council.agent import WisdomCouncilAgent
-from wisdom_council.council import WisdomCouncil, CouncilHead, CouncilDecision
+from wisdom_council.council import WisdomCouncil, CouncilHead, CouncilDecision, StreamEvent
 from wisdom_council.heads import Architect, Oracle, Guardian, Synthesizer
 from wisdom_council.executor import Executor, SubAgent
 from wisdom_council.memory import MemoryManager
 from wisdom_council.checkpoint import Checkpointer
+from wisdom_council.llm import BaseLLMClient, OllamaClient, StreamChunk
 from wisdom_council.plan import (
     Plan,
     PlanItem,
@@ -39,6 +40,7 @@ __all__ = [
     "WisdomCouncil",
     "CouncilHead",
     "CouncilDecision",
+    "StreamEvent",
     # Heads
     "Architect",
     "Oracle",
@@ -51,6 +53,10 @@ __all__ = [
     "MemoryManager",
     # Checkpointing
     "Checkpointer",
+    # LLM Clients
+    "BaseLLMClient",
+    "OllamaClient",
+    "StreamChunk",
     # Plan Management
     "Plan",
     "PlanItem",

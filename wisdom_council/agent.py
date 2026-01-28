@@ -393,13 +393,19 @@ class WisdomCouncilAgent:
     async def stream(
         self,
         task: str,
-        context: Optional[dict] = None
+        context: Optional[dict] = None,
+        enable_thinking: bool = False
     ) -> AsyncGenerator[AgentEvent, None]:
         """
         Stream execution events as they occur.
-        
+
+        Args:
+            task: The task description
+            context: Additional context
+            enable_thinking: If True, stream thinking/reasoning tokens in real-time
+
         Yields:
-            AgentEvent objects for each step
+            AgentEvent objects for each step, including thinking tokens when enabled
         """
         thread_id = str(uuid.uuid4())
         context = context or {}
@@ -432,17 +438,35 @@ class WisdomCouncilAgent:
         
         # 2. Council deliberation - stream each head's contribution
         yield AgentEvent(
-            type="status", 
+            type="status",
             content="Council deliberation starting..."
         )
-        
-        async for event in self.council.stream_deliberate(task, context):
-            yield AgentEvent(
-                type="council_deliberation",
-                content=event.content,
-                head=event.head,
-                metadata=event.metadata
-            )
+
+        async for event in self.council.stream_deliberate(task, context, enable_thinking=enable_thinking):
+            if event.event_type == "thinking":
+                # Stream thinking/reasoning tokens in real-time
+                yield AgentEvent(
+                    type="thinking",
+                    content=event.content,
+                    head=event.head,
+                    metadata={"is_thinking": True}
+                )
+            elif event.event_type == "token":
+                # Stream content tokens in real-time
+                yield AgentEvent(
+                    type="token",
+                    content=event.content,
+                    head=event.head,
+                    metadata={"is_token": True}
+                )
+            else:
+                # Other event types (proposal, critique, status, etc.)
+                yield AgentEvent(
+                    type="council_deliberation",
+                    content=event.content,
+                    head=event.head,
+                    metadata=event.metadata
+                )
         
         # Get final decision
         decision = await self.council.get_decision()

@@ -75,19 +75,19 @@ Your output must always include: steps, timeline, resources, risks."""
             config=config
         )
     
-    async def propose(self, task: str, context: dict) -> Proposal:
-        """Generate systematic, logical proposal"""
-        prompt = f"""
+    def _build_propose_prompt(self, task: str, context: dict) -> str:
+        """Build the prompt for proposal generation"""
+        return f"""
         TASK: {task}
-        
+
         CONTEXT: {context}
-        
+
         YOUR CONSTITUTION:
         {self._format_constitution()}
-        
+
         Provide your proposal for how to approach this task.
         Apply rigorous logical analysis.
-        
+
         Format your response:
         PROPOSAL: [your recommended approach with specific steps]
         REASONING: [logical justification]
@@ -98,12 +98,16 @@ Your output must always include: steps, timeline, resources, risks."""
         QUESTIONS: [what you'd ask other council members]
         CONFIDENCE: [0.0-1.0 confidence score]
         """
-        
+
+    async def propose(self, task: str, context: dict) -> Proposal:
+        """Generate systematic, logical proposal"""
+        prompt = self._build_propose_prompt(task, context)
+
         response = await self._llm.invoke(
             system_prompt=self.system_prompt,
             user_prompt=prompt
         )
-        
+
         return self._parse_proposal(response)
     
     async def critique(self, task: str, proposals: dict[str, Proposal]) -> Critique:
@@ -273,21 +277,21 @@ potential blind spots, alternative framings."""
             config=config
         )
     
-    async def propose(self, task: str, context: dict) -> Proposal:
-        """Generate wisdom-centered proposal"""
-        prompt = f"""
+    def _build_propose_prompt(self, task: str, context: dict) -> str:
+        """Build the prompt for proposal generation"""
+        return f"""
         TASK: {task}
-        
+
         CONTEXT: {context}
-        
+
         YOUR CONSTITUTION:
         {self._format_constitution()}
-        
+
         Before proposing, consider:
         - What does the human REALLY need? (not just what they asked)
         - What emotions or politics might be at play?
         - What's the simplest path to genuine value?
-        
+
         Format your response:
         UNDERLYING_NEED: [what the human actually needs]
         PROPOSAL: [your wisdom-centered approach]
@@ -298,12 +302,16 @@ potential blind spots, alternative framings."""
         QUESTIONS: [what we should ask ourselves]
         CONFIDENCE: [0.0-1.0]
         """
-        
+
+    async def propose(self, task: str, context: dict) -> Proposal:
+        """Generate wisdom-centered proposal"""
+        prompt = self._build_propose_prompt(task, context)
+
         response = await self._llm.invoke(
             system_prompt=self.system_prompt,
             user_prompt=prompt
         )
-        
+
         return self._parse_proposal(response)
     
     async def critique(self, task: str, proposals: dict[str, Proposal]) -> Critique:
@@ -405,19 +413,19 @@ recommended safeguards."""
             config=config
         )
     
-    async def propose(self, task: str, context: dict) -> Proposal:
-        """Generate safety-first proposal"""
-        prompt = f"""
+    def _build_propose_prompt(self, task: str, context: dict) -> str:
+        """Build the prompt for proposal generation"""
+        return f"""
         TASK: {task}
-        
+
         CONTEXT: {context}
-        
+
         YOUR CONSTITUTION:
         {self._format_constitution()}
-        
+
         First, assess: What could go wrong? What harm could occur?
         Then propose an approach that minimizes risk.
-        
+
         Format:
         RISK_ASSESSMENT: [potential harms identified]
         PROPOSAL: [safety-first approach]
@@ -429,12 +437,16 @@ recommended safeguards."""
         QUESTIONS: [questions for other heads]
         CONFIDENCE: [0.0-1.0]
         """
-        
+
+    async def propose(self, task: str, context: dict) -> Proposal:
+        """Generate safety-first proposal"""
+        prompt = self._build_propose_prompt(task, context)
+
         response = await self._llm.invoke(
             system_prompt=self.system_prompt,
             user_prompt=prompt
         )
-        
+
         return self._parse_proposal(response)
     
     async def critique(self, task: str, proposals: dict[str, Proposal]) -> Critique:
