@@ -655,18 +655,21 @@ class WisdomCouncilAgent:
 
             # Check guardian review first
             if decision.guardian_review and not decision.guardian_review.passed:
-                violations = decision.guardian_review.violations
-                warnings = decision.guardian_review.warnings if hasattr(decision.guardian_review, 'warnings') else []
-                if violations:
+                violations = decision.guardian_review.violations or []
+                warnings = getattr(decision.guardian_review, 'warnings', []) or []
+
+                # Filter to valid items only
+                valid_violations = [str(v) for v in violations if v and len(str(v).strip()) > 2]
+                valid_warnings = [str(w) for w in warnings if w and len(str(w).strip()) > 2]
+
+                if valid_violations:
                     rejection_lines.append("\n⚠ Guardian VETO:")
-                    for violation in violations[:5]:
-                        if violation and len(str(violation)) > 2:
-                            rejection_lines.append(f"  • {str(violation)[:100]}{'...' if len(str(violation)) > 100 else ''}")
-                elif warnings:
+                    for violation in valid_violations[:5]:
+                        rejection_lines.append(f"  • {violation[:100]}{'...' if len(violation) > 100 else ''}")
+                elif valid_warnings:
                     rejection_lines.append("\n⚠ Guardian Warnings:")
-                    for warning in warnings[:5]:
-                        if warning and len(str(warning)) > 2:
-                            rejection_lines.append(f"  • {str(warning)[:100]}{'...' if len(str(warning)) > 100 else ''}")
+                    for warning in valid_warnings[:5]:
+                        rejection_lines.append(f"  • {warning[:100]}{'...' if len(warning) > 100 else ''}")
                 else:
                     rejection_lines.append("\n⚠ Guardian VETO: Task did not pass safety review")
 
@@ -674,12 +677,12 @@ class WisdomCouncilAgent:
             if decision.dissents:
                 for dissent in decision.dissents:
                     head = dissent.get('head', 'Unknown')
-                    concerns = dissent.get('concerns', [])
-                    if concerns:
+                    concerns = dissent.get('concerns', []) or []
+                    valid_concerns = [str(c) for c in concerns if c and len(str(c).strip()) > 2]
+                    if valid_concerns:
                         rejection_lines.append(f"\n⚠ {head}:")
-                        for concern in concerns[:5]:
-                            if concern and len(str(concern)) > 2:
-                                rejection_lines.append(f"  • {str(concern)[:100]}{'...' if len(str(concern)) > 100 else ''}")
+                        for concern in valid_concerns[:5]:
+                            rejection_lines.append(f"  • {concern[:100]}{'...' if len(concern) > 100 else ''}")
 
             # If no specific reasons, add generic message
             if len(rejection_lines) == 1:
