@@ -655,9 +655,20 @@ class WisdomCouncilAgent:
 
             # Check guardian review first
             if decision.guardian_review and not decision.guardian_review.passed:
-                rejection_lines.append("\n⚠ Guardian VETO:")
-                for violation in decision.guardian_review.violations[:5]:
-                    rejection_lines.append(f"  • {violation[:100]}{'...' if len(violation) > 100 else ''}")
+                violations = decision.guardian_review.violations
+                warnings = decision.guardian_review.warnings if hasattr(decision.guardian_review, 'warnings') else []
+                if violations:
+                    rejection_lines.append("\n⚠ Guardian VETO:")
+                    for violation in violations[:5]:
+                        if violation and len(str(violation)) > 2:
+                            rejection_lines.append(f"  • {str(violation)[:100]}{'...' if len(str(violation)) > 100 else ''}")
+                elif warnings:
+                    rejection_lines.append("\n⚠ Guardian Warnings:")
+                    for warning in warnings[:5]:
+                        if warning and len(str(warning)) > 2:
+                            rejection_lines.append(f"  • {str(warning)[:100]}{'...' if len(str(warning)) > 100 else ''}")
+                else:
+                    rejection_lines.append("\n⚠ Guardian VETO: Task did not pass safety review")
 
             # Add any dissents
             if decision.dissents:
@@ -667,7 +678,8 @@ class WisdomCouncilAgent:
                     if concerns:
                         rejection_lines.append(f"\n⚠ {head}:")
                         for concern in concerns[:5]:
-                            rejection_lines.append(f"  • {concern[:100]}{'...' if len(concern) > 100 else ''}")
+                            if concern and len(str(concern)) > 2:
+                                rejection_lines.append(f"  • {str(concern)[:100]}{'...' if len(str(concern)) > 100 else ''}")
 
             # If no specific reasons, add generic message
             if len(rejection_lines) == 1:
