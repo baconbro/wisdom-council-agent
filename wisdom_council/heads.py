@@ -218,20 +218,53 @@ Your output must always include: steps, timeline, resources, risks."""
         concerns = []
         suggested_changes = []
         questions = []
-        
-        if "AGREEMENTS:" in response:
-            agreements_text = response.split("AGREEMENTS:")[1].split("CONCERNS:")[0].strip()
-            agreements = [a.strip() for a in agreements_text.split("\n") if a.strip()]
-        if "CONCERNS:" in response:
-            concerns_text = response.split("CONCERNS:")[1].split("SUGGESTED_CHANGES:")[0].strip()
-            concerns = [c.strip() for c in concerns_text.split("\n") if c.strip()]
-        if "SUGGESTED_CHANGES:" in response:
-            changes_text = response.split("SUGGESTED_CHANGES:")[1].split("QUESTIONS:")[0].strip()
-            suggested_changes = [s.strip() for s in changes_text.split("\n") if s.strip()]
-        if "QUESTIONS:" in response:
-            questions_text = response.split("QUESTIONS:")[1].strip()
-            questions = [q.strip() for q in questions_text.split("\n") if q.strip()]
-        
+
+        # Make parsing case-insensitive
+        response_upper = response.upper()
+
+        if "AGREEMENTS:" in response_upper:
+            idx = response_upper.index("AGREEMENTS:")
+            text_after = response[idx + len("AGREEMENTS:"):]
+            # Find the next section
+            for marker in ["CONCERNS:", "SUGGESTED_CHANGES:", "QUESTIONS:", "BLIND_SPOTS:"]:
+                if marker in text_after.upper():
+                    marker_idx = text_after.upper().index(marker)
+                    text_after = text_after[:marker_idx]
+                    break
+            agreements = [a.strip() for a in text_after.strip().split("\n") if a.strip() and not a.strip().startswith("-") == False]
+            agreements = [a.lstrip("- •*").strip() for a in text_after.strip().split("\n") if a.strip()]
+
+        if "CONCERNS:" in response_upper:
+            idx = response_upper.index("CONCERNS:")
+            text_after = response[idx + len("CONCERNS:"):]
+            for marker in ["SUGGESTED_CHANGES:", "QUESTIONS:", "BLIND_SPOTS:", "AGREEMENTS:"]:
+                if marker in text_after.upper():
+                    marker_idx = text_after.upper().index(marker)
+                    text_after = text_after[:marker_idx]
+                    break
+            concerns = [c.lstrip("- •*").strip() for c in text_after.strip().split("\n") if c.strip()]
+
+        if "SUGGESTED_CHANGES:" in response_upper or "SUGGESTED CHANGES:" in response_upper:
+            marker = "SUGGESTED_CHANGES:" if "SUGGESTED_CHANGES:" in response_upper else "SUGGESTED CHANGES:"
+            idx = response_upper.index(marker)
+            text_after = response[idx + len(marker):]
+            for m in ["QUESTIONS:", "CONCERNS:", "AGREEMENTS:"]:
+                if m in text_after.upper():
+                    marker_idx = text_after.upper().index(m)
+                    text_after = text_after[:marker_idx]
+                    break
+            suggested_changes = [s.lstrip("- •*").strip() for s in text_after.strip().split("\n") if s.strip()]
+
+        if "QUESTIONS:" in response_upper:
+            idx = response_upper.index("QUESTIONS:")
+            text_after = response[idx + len("QUESTIONS:"):]
+            for marker in ["CONCERNS:", "AGREEMENTS:", "SUGGESTED"]:
+                if marker in text_after.upper():
+                    marker_idx = text_after.upper().index(marker)
+                    text_after = text_after[:marker_idx]
+                    break
+            questions = [q.lstrip("- •*").strip() for q in text_after.strip().split("\n") if q.strip()]
+
         return Critique(
             head=self.name,
             agreements=agreements,
