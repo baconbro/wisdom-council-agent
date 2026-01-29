@@ -214,6 +214,27 @@ Your output must always include: steps, timeline, resources, risks."""
     
     def _parse_critique(self, response: str) -> Critique:
         """Parse critique from LLM response"""
+        def clean_item(text: str) -> str:
+            """Clean a single list item"""
+            # Remove leading bullets and markers
+            text = text.lstrip("- •*#>").strip()
+            # Remove markdown bold markers
+            text = text.replace("**", "").strip()
+            # Remove numbered list prefixes like "1.", "2)"
+            if len(text) > 2 and text[0].isdigit() and text[1] in ".)":
+                text = text[2:].strip()
+            return text
+
+        def parse_section(text: str) -> list[str]:
+            """Parse a section into clean list items"""
+            items = []
+            for line in text.strip().split("\n"):
+                cleaned = clean_item(line)
+                # Skip empty lines and pure markers
+                if cleaned and len(cleaned) > 2:
+                    items.append(cleaned)
+            return items
+
         agreements = []
         concerns = []
         suggested_changes = []
@@ -225,24 +246,22 @@ Your output must always include: steps, timeline, resources, risks."""
         if "AGREEMENTS:" in response_upper:
             idx = response_upper.index("AGREEMENTS:")
             text_after = response[idx + len("AGREEMENTS:"):]
-            # Find the next section
-            for marker in ["CONCERNS:", "SUGGESTED_CHANGES:", "QUESTIONS:", "BLIND_SPOTS:"]:
+            for marker in ["CONCERNS:", "SUGGESTED_CHANGES:", "SUGGESTED CHANGES:", "QUESTIONS:", "BLIND_SPOTS:"]:
                 if marker in text_after.upper():
                     marker_idx = text_after.upper().index(marker)
                     text_after = text_after[:marker_idx]
                     break
-            agreements = [a.strip() for a in text_after.strip().split("\n") if a.strip() and not a.strip().startswith("-") == False]
-            agreements = [a.lstrip("- •*").strip() for a in text_after.strip().split("\n") if a.strip()]
+            agreements = parse_section(text_after)
 
         if "CONCERNS:" in response_upper:
             idx = response_upper.index("CONCERNS:")
             text_after = response[idx + len("CONCERNS:"):]
-            for marker in ["SUGGESTED_CHANGES:", "QUESTIONS:", "BLIND_SPOTS:", "AGREEMENTS:"]:
+            for marker in ["SUGGESTED_CHANGES:", "SUGGESTED CHANGES:", "QUESTIONS:", "BLIND_SPOTS:", "AGREEMENTS:"]:
                 if marker in text_after.upper():
                     marker_idx = text_after.upper().index(marker)
                     text_after = text_after[:marker_idx]
                     break
-            concerns = [c.lstrip("- •*").strip() for c in text_after.strip().split("\n") if c.strip()]
+            concerns = parse_section(text_after)
 
         if "SUGGESTED_CHANGES:" in response_upper or "SUGGESTED CHANGES:" in response_upper:
             marker = "SUGGESTED_CHANGES:" if "SUGGESTED_CHANGES:" in response_upper else "SUGGESTED CHANGES:"
@@ -253,7 +272,7 @@ Your output must always include: steps, timeline, resources, risks."""
                     marker_idx = text_after.upper().index(m)
                     text_after = text_after[:marker_idx]
                     break
-            suggested_changes = [s.lstrip("- •*").strip() for s in text_after.strip().split("\n") if s.strip()]
+            suggested_changes = parse_section(text_after)
 
         if "QUESTIONS:" in response_upper:
             idx = response_upper.index("QUESTIONS:")
@@ -263,7 +282,7 @@ Your output must always include: steps, timeline, resources, risks."""
                     marker_idx = text_after.upper().index(marker)
                     text_after = text_after[:marker_idx]
                     break
-            questions = [q.lstrip("- •*").strip() for q in text_after.strip().split("\n") if q.strip()]
+            questions = parse_section(text_after)
 
         return Critique(
             head=self.name,

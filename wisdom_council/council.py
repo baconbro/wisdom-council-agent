@@ -519,10 +519,26 @@ class WisdomCouncil:
                 critique = await head.critique(task, other_proposals)
                 critiques[head.name] = critique
                 
+                # Format critique content nicely
+                critique_lines = []
+                if critique.agreements:
+                    critique_lines.append("✓ Agreements:")
+                    for a in critique.agreements[:3]:  # Limit to top 3
+                        critique_lines.append(f"  • {a[:100]}{'...' if len(a) > 100 else ''}")
+                if critique.concerns:
+                    critique_lines.append("⚠ Concerns:")
+                    for c in critique.concerns[:3]:  # Limit to top 3
+                        critique_lines.append(f"  • {c[:100]}{'...' if len(c) > 100 else ''}")
+
                 yield StreamEvent(
                     head=head.name,
-                    content=f"Agreements: {critique.agreements}\nConcerns: {critique.concerns}",
-                    event_type="critique"
+                    content="\n".join(critique_lines) if critique_lines else "(No specific feedback)",
+                    event_type="critique",
+                    metadata={
+                        "agreements": critique.agreements,
+                        "concerns": critique.concerns,
+                        "suggested_changes": critique.suggested_changes
+                    }
                 )
             
             has_consensus = self._check_consensus(critiques)
