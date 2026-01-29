@@ -650,6 +650,21 @@ class WisdomCouncilAgent:
         decision = await self.council.deliberate(task, context)
 
         if not decision.approved:
+            # Helper to flatten and clean items
+            def flatten_items(items):
+                """Flatten nested lists and extract valid string items"""
+                result = []
+                for item in items:
+                    if isinstance(item, list):
+                        result.extend(flatten_items(item))
+                    elif item and isinstance(item, str) and len(item.strip()) > 2:
+                        result.append(item.strip())
+                    elif item and not isinstance(item, (list, str)):
+                        s = str(item).strip()
+                        if len(s) > 2:
+                            result.append(s)
+                return result
+
             # Format rejection reason
             rejection_lines = ["Council rejected task:"]
 
@@ -658,9 +673,9 @@ class WisdomCouncilAgent:
                 violations = decision.guardian_review.violations or []
                 warnings = getattr(decision.guardian_review, 'warnings', []) or []
 
-                # Filter to valid items only
-                valid_violations = [str(v) for v in violations if v and len(str(v).strip()) > 2]
-                valid_warnings = [str(w) for w in warnings if w and len(str(w).strip()) > 2]
+                # Flatten and filter to valid items only
+                valid_violations = flatten_items(violations)
+                valid_warnings = flatten_items(warnings)
 
                 if valid_violations:
                     rejection_lines.append("\n⚠ Guardian VETO:")
@@ -678,7 +693,7 @@ class WisdomCouncilAgent:
                 for dissent in decision.dissents:
                     head = dissent.get('head', 'Unknown')
                     concerns = dissent.get('concerns', []) or []
-                    valid_concerns = [str(c) for c in concerns if c and len(str(c).strip()) > 2]
+                    valid_concerns = flatten_items(concerns)
                     if valid_concerns:
                         rejection_lines.append(f"\n⚠ {head}:")
                         for concern in valid_concerns[:5]:
