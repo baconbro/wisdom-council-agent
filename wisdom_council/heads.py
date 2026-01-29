@@ -558,33 +558,86 @@ recommended safeguards."""
     
     def _parse_guardian_critique(self, response: str) -> Critique:
         """Parse Guardian-specific critique"""
+        def clean_item(text: str) -> str:
+            """Clean a single list item"""
+            text = text.lstrip("- •*#>").strip()
+            text = text.replace("**", "").strip()
+            if len(text) > 2 and text[0].isdigit() and text[1] in ".)":
+                text = text[2:].strip()
+            return text
+
+        def parse_section(text: str) -> list[str]:
+            """Parse a section into clean list items"""
+            items = []
+            for line in text.strip().split("\n"):
+                cleaned = clean_item(line)
+                if cleaned and len(cleaned) > 2:
+                    items.append(cleaned)
+            return items
+
         agreements = []
         concerns = []
         suggested_changes = []
         questions = []
-        
-        if "AGREEMENTS:" in response:
-            agreements_text = response.split("AGREEMENTS:")[1].split("SAFETY_CONCERNS:")[0].strip()
-            agreements = [a.strip() for a in agreements_text.split("\n") if a.strip()]
-        
-        # Combine safety and ethical concerns
-        if "SAFETY_CONCERNS:" in response:
-            safety_text = response.split("SAFETY_CONCERNS:")[1].split("ETHICAL_CONCERNS:")[0].strip()
-            concerns.extend([f"[SAFETY] {c.strip()}" for c in safety_text.split("\n") if c.strip()])
-        if "ETHICAL_CONCERNS:" in response:
-            ethical_text = response.split("ETHICAL_CONCERNS:")[1].split("VETO_WORTHY:")[0].strip()
-            concerns.extend([f"[ETHICAL] {c.strip()}" for c in ethical_text.split("\n") if c.strip()])
-        if "VETO_WORTHY:" in response:
-            veto_text = response.split("VETO_WORTHY:")[1].split("SUGGESTED_SAFEGUARDS:")[0].strip()
-            concerns.extend([f"[VETO] {c.strip()}" for c in veto_text.split("\n") if c.strip()])
-        
-        if "SUGGESTED_SAFEGUARDS:" in response:
-            safeguards_text = response.split("SUGGESTED_SAFEGUARDS:")[1].split("QUESTIONS:")[0].strip()
-            suggested_changes = [s.strip() for s in safeguards_text.split("\n") if s.strip()]
-        if "QUESTIONS:" in response:
-            questions_text = response.split("QUESTIONS:")[1].strip()
-            questions = [q.strip() for q in questions_text.split("\n") if q.strip()]
-        
+        response_upper = response.upper()
+
+        if "AGREEMENTS:" in response_upper:
+            idx = response_upper.index("AGREEMENTS:")
+            text_after = response[idx + len("AGREEMENTS:"):]
+            for marker in ["SAFETY_CONCERNS:", "SAFETY CONCERNS:", "ETHICAL_CONCERNS:", "CONCERNS:"]:
+                if marker in text_after.upper():
+                    text_after = text_after[:text_after.upper().index(marker)]
+                    break
+            agreements = parse_section(text_after)
+
+        # Combine safety and ethical concerns (without prefixes)
+        if "SAFETY_CONCERNS:" in response_upper or "SAFETY CONCERNS:" in response_upper:
+            marker = "SAFETY_CONCERNS:" if "SAFETY_CONCERNS:" in response_upper else "SAFETY CONCERNS:"
+            idx = response_upper.index(marker)
+            text_after = response[idx + len(marker):]
+            for m in ["ETHICAL_CONCERNS:", "ETHICAL CONCERNS:", "VETO_WORTHY:", "VETO WORTHY:"]:
+                if m in text_after.upper():
+                    text_after = text_after[:text_after.upper().index(m)]
+                    break
+            concerns.extend(parse_section(text_after))
+
+        if "ETHICAL_CONCERNS:" in response_upper or "ETHICAL CONCERNS:" in response_upper:
+            marker = "ETHICAL_CONCERNS:" if "ETHICAL_CONCERNS:" in response_upper else "ETHICAL CONCERNS:"
+            idx = response_upper.index(marker)
+            text_after = response[idx + len(marker):]
+            for m in ["VETO_WORTHY:", "VETO WORTHY:", "SUGGESTED_SAFEGUARDS:", "SUGGESTED SAFEGUARDS:"]:
+                if m in text_after.upper():
+                    text_after = text_after[:text_after.upper().index(m)]
+                    break
+            concerns.extend(parse_section(text_after))
+
+        if "VETO_WORTHY:" in response_upper or "VETO WORTHY:" in response_upper:
+            marker = "VETO_WORTHY:" if "VETO_WORTHY:" in response_upper else "VETO WORTHY:"
+            idx = response_upper.index(marker)
+            text_after = response[idx + len(marker):]
+            for m in ["SUGGESTED_SAFEGUARDS:", "SUGGESTED SAFEGUARDS:", "QUESTIONS:"]:
+                if m in text_after.upper():
+                    text_after = text_after[:text_after.upper().index(m)]
+                    break
+            veto_items = parse_section(text_after)
+            # Only add veto items if they indicate actual veto triggers
+            for item in veto_items:
+                if "yes" in item.lower() or "veto" in item.lower() or "trigger" in item.lower():
+                    concerns.append(f"VETO: {item}")
+
+        if "SUGGESTED_SAFEGUARDS:" in response_upper or "SUGGESTED SAFEGUARDS:" in response_upper:
+            marker = "SUGGESTED_SAFEGUARDS:" if "SUGGESTED_SAFEGUARDS:" in response_upper else "SUGGESTED SAFEGUARDS:"
+            idx = response_upper.index(marker)
+            text_after = response[idx + len(marker):]
+            if "QUESTIONS:" in text_after.upper():
+                text_after = text_after[:text_after.upper().index("QUESTIONS:")]
+            suggested_changes = parse_section(text_after)
+
+        if "QUESTIONS:" in response_upper:
+            idx = response_upper.index("QUESTIONS:")
+            text_after = response[idx + len("QUESTIONS:"):]
+            questions = parse_section(text_after)
+
         return Critique(
             head=self.name,
             agreements=agreements,

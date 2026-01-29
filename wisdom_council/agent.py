@@ -313,8 +313,15 @@ class WisdomCouncilAgent:
             })
             
             if not decision.approved:
+                # Format dissents nicely
+                dissent_lines = ["Task blocked by council:"]
+                for dissent in decision.dissents:
+                    head = dissent.get('head', 'Unknown')
+                    dissent_lines.append(f"\n⚠ {head}:")
+                    for concern in dissent.get('concerns', [])[:5]:
+                        dissent_lines.append(f"  • {concern[:100]}{'...' if len(concern) > 100 else ''}")
                 return AgentResult(
-                    final_output=f"Task blocked by council: {decision.dissents}",
+                    final_output="\n".join(dissent_lines),
                     deliberation=decision,
                     execution_trace=execution_trace,
                     tokens_used=tokens_used,
@@ -479,9 +486,16 @@ class WisdomCouncilAgent:
             return
 
         if not decision.approved:
+            # Format dissents nicely
+            dissent_lines = ["Task blocked by council:"]
+            for dissent in decision.dissents:
+                head = dissent.get('head', 'Unknown')
+                dissent_lines.append(f"\n⚠ {head}:")
+                for concern in dissent.get('concerns', [])[:5]:
+                    dissent_lines.append(f"  • {concern[:100]}{'...' if len(concern) > 100 else ''}")
             yield AgentEvent(
                 type="final_output",
-                content=f"Task blocked: {decision.dissents}"
+                content="\n".join(dissent_lines)
             )
             return
         
