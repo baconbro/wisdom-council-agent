@@ -650,7 +650,30 @@ class WisdomCouncilAgent:
         decision = await self.council.deliberate(task, context)
 
         if not decision.approved:
-            raise ValueError(f"Council rejected task: {decision.dissents}")
+            # Format rejection reason
+            rejection_lines = ["Council rejected task:"]
+
+            # Check guardian review first
+            if decision.guardian_review and not decision.guardian_review.passed:
+                rejection_lines.append("\n⚠ Guardian VETO:")
+                for violation in decision.guardian_review.violations[:5]:
+                    rejection_lines.append(f"  • {violation[:100]}{'...' if len(violation) > 100 else ''}")
+
+            # Add any dissents
+            if decision.dissents:
+                for dissent in decision.dissents:
+                    head = dissent.get('head', 'Unknown')
+                    concerns = dissent.get('concerns', [])
+                    if concerns:
+                        rejection_lines.append(f"\n⚠ {head}:")
+                        for concern in concerns[:5]:
+                            rejection_lines.append(f"  • {concern[:100]}{'...' if len(concern) > 100 else ''}")
+
+            # If no specific reasons, add generic message
+            if len(rejection_lines) == 1:
+                rejection_lines.append("\n  (No specific reason provided)")
+
+            raise ValueError("\n".join(rejection_lines))
 
         # 3. Parse the plan into structured items
         plan_items = self._parse_plan_to_items(decision.plan)
